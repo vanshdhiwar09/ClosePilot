@@ -1,0 +1,87 @@
+{
+  "fixtureVersion": "2024.1",
+  "description": "Ground truth for month-end reconciliation synthetic fixture - 8 test cases",
+  "createdAt": "2024-01-30T11:00:00Z",
+  "evaluationCases": [
+    {
+      "id": "EC001",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT001",
+      "expectedLedgerEntryIds": ["LE001"],
+      "expectedStatus": "matched",
+      "expectedExceptionTypes": [],
+      "expectedAutoResolutionAllowed": true,
+      "notes": "Exact match: amount $1250.00, reference INV-001, date 2024-01-15, same counterparty Vendor A"
+    },
+    {
+      "id": "EC002",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT002",
+      "expectedLedgerEntryIds": [],
+      "expectedStatus": "exception",
+      "expectedExceptionTypes": ["unmatched_transaction"],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "No eligible ledger entry for account Acct456; no candidate found within matching rules"
+    },
+    {
+      "id": "EC003",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT003",
+      "expectedLedgerEntryIds": ["LE003"],
+      "expectedStatus": "exception",
+      "expectedExceptionTypes": ["amount_mismatch"],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "Amount mismatch: bank $2500.00 vs ledger $2750.00, same reference INV-003 and date, but amounts differ by $250.00"
+    },
+    {
+      "id": "EC004",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT004",
+      "expectedLedgerEntryIds": ["LE001"],
+      "expectedStatus": "exception",
+      "expectedExceptionTypes": ["timing_difference"],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "Timing difference: same amount $1250.00 and reference INV-001, but bank date 2024-01-16 vs ledger 2024-01-15, outside exact window"
+    },
+    {
+      "id": "EC005",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT005",
+      "expectedLedgerEntryIds": ["LE005", "LE006"],
+      "expectedStatus": "exception",
+      "expectedExceptionTypes": ["duplicate"],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "Duplicate: same account Acct123, amount $500.00, reference INV-005, near-identical dates 2024-01-28 and 2024-01-29. Two candidates found."
+    },
+    {
+      "id": "EC006",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT006",
+      "expectedLedgerEntryIds": ["LE004"],
+      "expectedStatus": "exception",
+      "expectedExceptionTypes": ["missing_documentation"],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "Missing documentation: amount $300.00, reference INV-003, date 2024-01-22 match, but no supporting document linked to ledger entry LE004"
+    },
+    {
+      "id": "EC007",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT007",
+      "expectedLedgerEntryIds": ["LE009"],
+      "expectedStatus": "exception",
+      "expectedExceptionTypes": ["potential_anomaly"],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "Potential anomaly: amount $15000.00 exceeds typical account threshold for Acct123 (expense/asset). Match would otherwise be exact (reference LARGE-001, date 2024-01-29), but deterministic outlier rule fires."
+    },
+    {
+      "id": "EC008",
+      "fixtureVersion": "2024.1",
+      "bankTransactionId": "BT008",
+      "expectedLedgerEntryIds": ["LE008a", "LE008b"],
+      "expectedStatus": "review_required",
+      "expectedExceptionTypes": [],
+      "expectedAutoResolutionAllowed": false,
+      "notes": "Ambiguous case: two qualifying ledger entries LE008a and LE008b with same amount $1000.00, reference AMB-001, and identical date 2024-01-27. Multiple candidates require human review to disambiguate."
+    }
+  ]
+}
