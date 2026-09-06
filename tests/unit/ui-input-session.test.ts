@@ -515,5 +515,156 @@ describe("Phase 7C: Input Session Layer & Reconciliation Execution", () => {
       expect(detail.flaggedReason.technicalDetails).toBeDefined();
       expect(detail.flaggedReason.technicalDetails).toContain("Policy requires controller review");
     });
+
+    // J. Uploaded dataset with supportingDocuments array (relaxed schema) validates and runs full reconciliation
+    it("J: uploaded dataset with supportingDocuments array validates and runs full reconciliation without errors", async () => {
+      const userUploadedJson = {
+        fixtureVersion: "demo-upload-2.0",
+        name: "ClosePilot LLM Reconciliation Test",
+        description: "Synthetic month-end reconciliation package for testing live LLM investigation, evidence handling, policy guardrails, and human review.",
+        source: "synthetic",
+        account: {
+          id: "AcctDemo",
+          name: "Demo Operating Account",
+          currency: "USD",
+        },
+        bankTransactions: [
+          {
+            id: "BT101",
+            accountId: "AcctDemo",
+            transactionDate: "2024-01-31",
+            amount: "1200.00",
+            currency: "USD",
+            direction: "debit",
+            source: "synthetic_bank",
+            sourceRecordId: "BT101",
+            schemaVersion: "1",
+            ingestedAt: "2026-09-06T15:05:10Z",
+            rawHash: "sha256:9be54ad7c61c03f8e8865327b5eccfcb47eb08bfa4ad8efd82dc9d0f9ca5e0e1",
+            vendor: "Apex Software",
+            reference: "INV-DEMO-001",
+            description: "Apex Software invoice payment",
+          },
+          {
+            id: "BT102",
+            accountId: "AcctDemo",
+            transactionDate: "2024-01-31",
+            amount: "3500.00",
+            currency: "USD",
+            direction: "debit",
+            source: "synthetic_bank",
+            sourceRecordId: "BT102",
+            schemaVersion: "1",
+            ingestedAt: "2026-09-06T15:05:10Z",
+            rawHash: "sha256:1cd25bf46e37f967be11962d30c887b491797278cd5e7cd196ea51220498b0be",
+            vendor: "Cloud Services",
+            reference: "INV-DEMO-002",
+            description: "Cloud Services invoice payment",
+          },
+          {
+            id: "BT103",
+            accountId: "AcctDemo",
+            transactionDate: "2024-01-31",
+            amount: "15000.00",
+            currency: "USD",
+            direction: "debit",
+            source: "synthetic_bank",
+            sourceRecordId: "BT103",
+            schemaVersion: "1",
+            ingestedAt: "2026-09-06T15:05:10Z",
+            rawHash: "sha256:eeff31a648d6a3388386d2b8eae77c806453850e137101d2b451bfce4d3277a2",
+            vendor: "Vendor G",
+            reference: "LARGE-DEMO-001",
+            description: "Large vendor payment requiring policy review",
+          },
+        ],
+        ledgerEntries: [
+          {
+            id: "LE101",
+            accountId: "AcctDemo",
+            entryDate: "2024-01-31",
+            debit: "1200.00",
+            credit: "0.00",
+            currency: "USD",
+            source: "synthetic_ledger",
+            sourceRecordId: "LE101",
+            schemaVersion: "1",
+            ingestedAt: "2026-09-06T15:05:10Z",
+            rawHash: "sha256:b343bdc3be507b1041f49e1722bdd98a5cd0fd767cbf3dd04bbbc68dc0329767",
+            vendor: "Apex Software",
+            reference: "INV-DEMO-001",
+            description: "Apex Software invoice",
+          },
+          {
+            id: "LE102",
+            accountId: "AcctDemo",
+            entryDate: "2024-01-31",
+            debit: "3400.00",
+            credit: "0.00",
+            currency: "USD",
+            source: "synthetic_ledger",
+            sourceRecordId: "LE102",
+            schemaVersion: "1",
+            ingestedAt: "2026-09-06T15:05:10Z",
+            rawHash: "sha256:c9ea7a8b952cbe1f670418a2c2249c50ec919d9ffa9a9cb7051672bc36476849",
+            vendor: "Cloud Services",
+            reference: "INV-DEMO-002",
+            description: "Cloud Services invoice",
+          },
+          {
+            id: "LE103",
+            accountId: "AcctDemo",
+            entryDate: "2024-01-31",
+            debit: "15000.00",
+            credit: "0.00",
+            currency: "USD",
+            source: "synthetic_ledger",
+            sourceRecordId: "LE103",
+            schemaVersion: "1",
+            ingestedAt: "2026-09-06T15:05:10Z",
+            rawHash: "sha256:eff7dc2add313e8e1da90f7cbab94f783991ef7937e585a67ea88a946627210b",
+            vendor: "Vendor G",
+            reference: "LARGE-DEMO-001",
+            description: "Large vendor invoice",
+          },
+        ],
+        supportingDocuments: [
+          {
+            id: "SD101",
+            type: "invoice",
+            reference: "INV-DEMO-001",
+            vendor: "Apex Software",
+            amount: 1200,
+            date: "2024-01-31",
+          },
+          {
+            id: "SD102",
+            type: "invoice",
+            reference: "INV-DEMO-002",
+            vendor: "Cloud Services",
+            amount: 3400,
+            date: "2024-01-31",
+          },
+          {
+            id: "SD103",
+            type: "invoice",
+            reference: "LARGE-DEMO-001",
+            vendor: "Vendor G",
+            amount: 15000,
+            date: "2024-01-31",
+          },
+        ],
+      };
+
+      const validation = validateReconciliationJSON(JSON.stringify(userUploadedJson));
+      expect(validation.isValid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      expect(validation.summary?.documentCount).toBe(3);
+
+      const state = await startReconciliationSession(userUploadedJson as any, "Upload Test");
+      expect(state.workflowResult.closePackage.cases).toHaveLength(3);
+      expect(state.activeDataset?.documentsCount).toBe(3);
+      expect(state.activeDataset?.bankTransactionsCount).toBe(3);
+    });
   });
 });

@@ -4,7 +4,7 @@
 
 import { BankTransaction } from "../schemas/bank-transaction";
 import { LedgerEntry } from "../schemas/ledger-entry";
-import { SupportingDocument } from "../schemas/supporting-document";
+import { SupportingDocument, normalizeSupportingDocumentInput } from "../schemas/supporting-document";
 import { EvaluationCase } from "../schemas/evaluation-case";
 import { loadFixture, loadGroundTruth } from "../schemas/fixture-loader";
 import {
@@ -83,7 +83,10 @@ export async function runEndToEndReconciliationWorkflow(
 
   const bankTransactions: BankTransaction[] = fixture.bankTransactions;
   const ledgerEntries: LedgerEntry[] = fixture.ledgerEntries;
-  const documents: SupportingDocument[] = fixture.documents;
+  const rawDocs = fixture.documents || fixture.supportingDocuments || [];
+  const documents: SupportingDocument[] = Array.isArray(rawDocs)
+    ? rawDocs.map((d: any, i: number) => normalizeSupportingDocumentInput(d, i))
+    : [];
   const evaluationCases: EvaluationCase[] = groundTruth.evaluationCases;
 
   const pipelineCtx = initializePipelineContext(bankTransactions, ledgerEntries);

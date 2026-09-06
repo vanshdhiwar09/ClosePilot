@@ -152,7 +152,7 @@ export function createFixtureReviewSession(
 
   const bankTransactions: BankTransaction[] = fixture.bankTransactions;
   const ledgerEntries: LedgerEntry[] = fixture.ledgerEntries;
-  const documents: SupportingDocument[] = fixture.documents;
+  const documents: SupportingDocument[] = fixture.documents || fixture.supportingDocuments || [];
   const evaluationCases: EvaluationCase[] = groundTruth.evaluationCases;
 
   const context = initializePipelineContext(bankTransactions, ledgerEntries);

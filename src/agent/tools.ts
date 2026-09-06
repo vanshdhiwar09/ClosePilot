@@ -29,13 +29,13 @@ export class ReadOnlyInvestigationToolbox {
   private readonly docMap = new Map<string, SupportingDocument>();
 
   constructor(private readonly context: InvestigationContext) {
-    for (const b of context.bankTransactions) {
+    for (const b of context.bankTransactions || []) {
       this.bankTxMap.set(b.id, b);
     }
-    for (const l of context.ledgerEntries) {
+    for (const l of context.ledgerEntries || []) {
       this.ledgerMap.set(l.id, l);
     }
-    for (const d of context.documents) {
+    for (const d of context.documents || []) {
       this.docMap.set(d.id, d);
     }
   }

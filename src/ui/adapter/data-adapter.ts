@@ -39,7 +39,7 @@ import {
 import { EvidenceItem } from "../../schemas/evidence-item";
 import { bankTransactionSchema } from "../../schemas/bank-transaction";
 import { ledgerEntrySchema } from "../../schemas/ledger-entry";
-import { supportingDocumentSchema } from "../../schemas/supporting-document";
+import { supportingDocumentSchema, normalizeSupportingDocumentInput } from "../../schemas/supporting-document";
 import { ApiInvestigationModelProvider } from "../../agent/api-provider";
 
 /**
@@ -185,11 +185,13 @@ export function validateReconciliationJSON(input: string | unknown): Reconciliat
     }
   }
 
-  // 3. Supporting Documents (optional array)
-  if (parsed.documents !== undefined) {
-    if (!Array.isArray(parsed.documents)) {
-      errors.push("'documents' must be an array when provided.");
+  // 3. Supporting Documents (optional array; accepts 'documents' or 'supportingDocuments')
+  const rawDocs = parsed.documents !== undefined ? parsed.documents : parsed.supportingDocuments;
+  if (rawDocs !== undefined) {
+    if (!Array.isArray(rawDocs)) {
+      errors.push("'documents' or 'supportingDocuments' must be an array when provided.");
     } else {
+      parsed.documents = rawDocs.map((doc: any, i: number) => normalizeSupportingDocumentInput(doc, i));
       for (let i = 0; i < parsed.documents.length; i++) {
         const res = supportingDocumentSchema.safeParse(parsed.documents[i]);
         if (!res.success) {
@@ -197,6 +199,8 @@ export function validateReconciliationJSON(input: string | unknown): Reconciliat
         }
       }
     }
+  } else {
+    parsed.documents = [];
   }
 
   if (errors.length > 0) {
@@ -295,7 +299,10 @@ export async function startReconciliationSession(
 
   const rawBankTxs = (fixtureData as any).bankTransactions || [];
   const rawLedgerEntries = (fixtureData as any).ledgerEntries || [];
-  const rawDocs = (fixtureData as any).documents || [];
+  const rawDocs = (fixtureData as any).documents || (fixtureData as any).supportingDocuments || [];
+  (fixtureData as any).documents = Array.isArray(rawDocs)
+    ? rawDocs.map((d: any, i: number) => normalizeSupportingDocumentInput(d, i))
+    : [];
 
   cachedState = {
     workflowResult,
