@@ -14,11 +14,14 @@ import { detectLedgerDuplicates, DuplicateGroup } from "./duplicates";
 import { computeAccountBaselines, AccountBaseline } from "./anomaly";
 import { classifyExceptions } from "./exceptions";
 
+import { MatchResult } from "./types";
+
 export type ReconcileTransactionOutput = {
   result: ReconciliationResult;
   exceptions: Exception[];
   evidence: EvidenceItem[];
   autoResolutionAllowed: boolean;
+  matchResult?: MatchResult;
 };
 
 export type PipelineContext = {
@@ -130,5 +133,6 @@ export function reconcileBankTransaction(
     exceptions: classification.exceptions,
     evidence: classification.evidenceItems,
     autoResolutionAllowed: classification.autoResolutionAllowed,
+    matchResult,
   };
 }
