@@ -16,6 +16,7 @@ import {
   getExceptionCases,
   getEvidenceDocuments,
   getClosePackageViewModel,
+  getCaseInvestigationDetail,
 } from "../../src/ui/adapter/data-adapter";
 import fixtureData from "../../data/fixtures/month-end-reconciliation-2024.1.json";
 
@@ -488,6 +489,31 @@ describe("Phase 7C: Input Session Layer & Reconciliation Execution", () => {
       expect(reviewTxIds).toContain("BT103");
       expect(reviewTxIds).toContain("BT102");
       expect(reviewTxIds).not.toContain("BT101"); // BT101 is auto-resolved
+    });
+
+    // I. Investigation detail for BT103 renders HIGH_VALUE_POLICY_GUARD instead of AMBIGUOUS_CANDIDATES
+    it("I: investigation detail for BT103 renders HIGH_VALUE_POLICY_GUARD and rootCause mentioning policy mandate", async () => {
+      const state = await startReconciliationSession(custom3TxFixture, "Custom 3-Tx Upload");
+      const cases = state.workflowResult.closePackage.cases;
+      const bt103Case = cases.find((c) => c.bankTransactionId === "BT103");
+      expect(bt103Case).toBeDefined();
+
+      const detail = getCaseInvestigationDetail(state, bt103Case!.caseId);
+
+      // Verify flaggedReason code is HIGH_VALUE_POLICY_GUARD, not AMBIGUOUS_CANDIDATES
+      expect(detail.flaggedReason.code).toBe("HIGH_VALUE_POLICY_GUARD");
+      expect(detail.flaggedReason.code).not.toBe("AMBIGUOUS_CANDIDATES");
+
+      // Verify description mentions exact match / high-value authorization
+      expect(detail.flaggedReason.description).toContain("human review policy mandated for high-value authorization");
+
+      // Verify candidate ledger entry is LE103 (single candidate)
+      expect(detail.candidateEntries).toHaveLength(1);
+      expect(detail.candidateEntries[0].id).toBe("LE103");
+
+      // Verify technicalDetails / policy mandate is populated
+      expect(detail.flaggedReason.technicalDetails).toBeDefined();
+      expect(detail.flaggedReason.technicalDetails).toContain("Policy requires controller review");
     });
   });
 });

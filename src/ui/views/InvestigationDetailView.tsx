@@ -93,6 +93,7 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
     : evidence.filter((e) => e.kind === evidenceFilter);
 
   const isTerminal = summary.reviewStatus === "RESOLVED" || summary.reviewStatus === "REJECTED";
+  const isPolicyGuard = flaggedReason.code.includes("POLICY") || flaggedReason.code.includes("GUARD");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -211,24 +212,50 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
         {/* Why Flagged (Deterministic Engine Output) */}
         <Card
           title="Why Was This Flagged?"
-          subtitle="Deterministic exception trigger from the reconciliation matching engine"
+          subtitle={
+            isPolicyGuard
+              ? "Deterministic policy guardrail from the reconciliation engine"
+              : "Deterministic exception trigger from the reconciliation matching engine"
+          }
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div
               style={{
                 padding: "12px 14px",
-                backgroundColor: "var(--cp-status-danger-bg)",
-                border: "1px solid var(--cp-status-danger-border)",
+                backgroundColor: isPolicyGuard ? "var(--cp-status-warning-bg)" : "var(--cp-status-danger-bg)",
+                border: `1px solid ${isPolicyGuard ? "var(--cp-status-warning-border)" : "var(--cp-status-danger-border)"}`,
                 borderRadius: "var(--cp-radius-sm)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span className="cp-mono" style={{ fontSize: "12px", fontWeight: 700, color: "var(--cp-status-danger-text)" }}>
+                <span
+                  className="cp-mono"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: isPolicyGuard ? "var(--cp-status-warning-text)" : "var(--cp-status-danger-text)",
+                  }}
+                >
                   {flaggedReason.code}
                 </span>
-                <Badge variant="rose" size="sm">Deterministic Outlier</Badge>
+                <Badge variant={isPolicyGuard ? "amber" : "rose"} size="sm">
+                  {isPolicyGuard
+                    ? "Policy Guardrail"
+                    : summary.exceptionType === "potential_anomaly"
+                    ? "Deterministic Outlier"
+                    : summary.exceptionType === "ambiguous"
+                    ? "Competing Candidates"
+                    : "Deterministic Exception"}
+                </Badge>
               </div>
-              <p style={{ fontSize: "13px", color: "var(--cp-status-danger-text)", marginTop: "6px", lineHeight: 1.4 }}>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: isPolicyGuard ? "var(--cp-status-warning-text)" : "var(--cp-status-danger-text)",
+                  marginTop: "6px",
+                  lineHeight: 1.4,
+                }}
+              >
                 {flaggedReason.description}
               </p>
             </div>
@@ -244,7 +271,9 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
                   color: "var(--cp-text-secondary)",
                 }}
               >
-                <span style={{ fontWeight: 600, color: "var(--cp-text-primary)" }}>Calculation Trigger: </span>
+                <span style={{ fontWeight: 600, color: "var(--cp-text-primary)" }}>
+                  {isPolicyGuard ? "Policy Mandate: " : "Calculation Trigger: "}
+                </span>
                 {flaggedReason.technicalDetails}
               </div>
             )}
@@ -263,6 +292,11 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
               <Badge variant={riskBadgeVariant} size="sm">Assessed Risk: {investigation.riskLevel}</Badge>
               {investigation.requiresHumanReview && (
                 <Badge variant="amber" size="sm">Human Review Enforced</Badge>
+              )}
+              {investigation.modelProvider && (
+                <Badge variant={investigation.modelProvider.includes("gemini") ? "emerald" : "neutral"} size="sm">
+                  Provider: {investigation.modelProvider}
+                </Badge>
               )}
             </div>
 

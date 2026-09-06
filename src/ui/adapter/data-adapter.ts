@@ -40,6 +40,7 @@ import { EvidenceItem } from "../../schemas/evidence-item";
 import { bankTransactionSchema } from "../../schemas/bank-transaction";
 import { ledgerEntrySchema } from "../../schemas/ledger-entry";
 import { supportingDocumentSchema } from "../../schemas/supporting-document";
+import { ApiInvestigationModelProvider } from "../../agent/api-provider";
 
 /**
  * Maps machine exception types into human-friendly finance operations labels.
@@ -276,9 +277,13 @@ export async function startReconciliationSession(
         evaluationCases,
       };
 
+  const modelProvider = new ApiInvestigationModelProvider();
   const workflowResult = await runEndToEndReconciliationWorkflow({
     fixtureData,
     groundTruthData,
+    investigatorOptions: {
+      modelProvider,
+    },
   });
 
   const evalReport = hasGroundTruth
@@ -529,14 +534,44 @@ export function getCaseInvestigationDetail(
     isFlagship,
   };
 
-  // Flagged reason extracted directly from deterministic output
-  let flaggedCode = exception?.reasonCode || (exception ? exception.type.toUpperCase() : "AMBIGUOUS_CANDIDATES");
-  let flaggedDesc = exception
-    ? `Reconciliation engine flagged an ${exceptionLabel.toLowerCase()} exception.`
-    : "Multiple candidate entries in the general ledger matched the transaction date and amount.";
+  // Flagged reason extracted directly from deterministic output & policy evaluation
+  let flaggedCode: string;
+  let flaggedDesc: string;
+  let technicalDetails: string | undefined;
 
   const calcEvidence = ctx.evidence.find((e) => e.kind === "calculation");
-  const technicalDetails = (calcEvidence?.payload as any)?.reason || undefined;
+  const calcDetails = (calcEvidence?.payload as any)?.reason || undefined;
+
+  const isExactMatchPolicyHold =
+    !exception &&
+    (ctx.reconciliationOutput.matchResult?.status === "exact_match" ||
+      (ctx.candidateLedgerEntries.length === 1 && ctx.reconciliationOutput.autoResolutionAllowed === false));
+
+  if (exception) {
+    flaggedCode = exception?.reasonCode || exception.type.toUpperCase();
+    flaggedDesc = `Reconciliation engine flagged an ${exceptionLabel.toLowerCase()} exception.`;
+    technicalDetails = calcDetails;
+  } else if (isExactMatchPolicyHold) {
+    flaggedCode = "HIGH_VALUE_POLICY_GUARD";
+    flaggedDesc =
+      inv.rootCause ||
+      "Exact match found in general ledger; high-value expenditure policy mandates human controller approval before close.";
+    const policyReasoning = inv.reasoningTrace?.find(
+      (r) => r.toLowerCase().includes("policy") || r.toLowerCase().includes("controller")
+    );
+    technicalDetails =
+      policyReasoning ||
+      calcDetails ||
+      "Exact match verified against candidate ledger entry. Auto-resolution withheld under high-value policy guardrail. Controller authorization required.";
+  } else {
+    flaggedCode = "AMBIGUOUS_CANDIDATES";
+    flaggedDesc =
+      inv.rootCause ||
+      "Multiple candidate entries in the general ledger matched the transaction date and amount.";
+    technicalDetails =
+      calcDetails ||
+      "Multiple candidate entries in the general ledger compete equally without autonomous disambiguation.";
+  }
 
   // Tool trace items from observability run trace
   const toolCalls: ToolTraceItemViewModel[] = (trace?.toolCalls || []).map((tc) => ({
@@ -647,6 +682,10 @@ export function getCaseInvestigationDetail(
       riskLevel: inv.riskLevel,
       requiresHumanReview: inv.requiresHumanReview,
       investigatedAt: inv.investigatedAt,
+      modelProvider:
+        (inv.metadata?.modelProvider as string) ||
+        (trace?.provider as string) ||
+        "deterministic_accounting_model_v1",
     },
     policyEvaluations,
     toolCalls,

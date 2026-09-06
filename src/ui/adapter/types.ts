@@ -170,6 +170,7 @@ export type CaseInvestigationDetail = {
     riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
     requiresHumanReview: boolean;
     investigatedAt: string;
+    modelProvider?: string;
   };
   policyEvaluations: PolicyGuardrailViewModel[];
   toolCalls: ToolTraceItemViewModel[];

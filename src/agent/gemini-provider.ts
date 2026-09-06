@@ -33,7 +33,7 @@ export class GeminiModelProvider implements InvestigationModelProvider {
       process.env.GEMINI_API_KEY ||
       process.env.GOOGLE_API_KEY ||
       "";
-    this.model = config?.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    this.model = config?.model || process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
     this.timeoutMs = config?.timeoutMs || 30_000;
     this.name = `gemini_rest_provider_${this.model}`;
   }

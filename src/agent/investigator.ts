@@ -354,7 +354,7 @@ export class AutonomousInvestigator {
       investigatedAt,
       toolCalls: toolbox.getRecordedToolCalls(),
       metadata: {
-        modelProvider: this.provider.name,
+        modelProvider: (modelResponse as any)?._modelProvider || this.provider.name,
         exceptionsDetected: exceptions,
         autoResolutionAllowed: caseDetail.autoResolutionAllowed,
         durationMs,
@@ -367,6 +367,8 @@ export class AutonomousInvestigator {
       requiresHumanReview: true,
     });
 
+    const effectiveProvider = (modelResponse as any)?._modelProvider || this.provider.name;
+
     recordTraceSafe({
       runId: investigationId,
       caseId,
@@ -374,7 +376,7 @@ export class AutonomousInvestigator {
       startTime: investigatedAt,
       endTime: new Date().toISOString(),
       durationMs,
-      provider: this.provider.name,
+      provider: effectiveProvider,
       outcome,
       recommendation: finalRecommendation,
       rawModelRecommendation:
