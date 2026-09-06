@@ -41,7 +41,8 @@ export default async function handler(
     }
 
     const result = await handleInvestigateRequest(body);
-    res.statusCode = result.status;
+    // Always return HTTP 200 so Vercel edge proxy never intercepts with HTML 500/502 pages
+    res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(result.data));
   } catch (err: any) {

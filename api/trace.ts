@@ -9,39 +9,50 @@ export default async function handler(
   req: IncomingMessage & { body?: any },
   res: ServerResponse
 ): Promise<void> {
-  if (req.method !== "POST") {
-    res.statusCode = 405;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "Method Not Allowed" }));
-    return;
-  }
-
-  let body = req.body;
-  if (typeof body === "string") {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      // fallback
-    }
-  }
-  if (!body) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-    }
-    const raw = Buffer.concat(chunks).toString("utf-8");
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      res.statusCode = 400;
+  try {
+    if (req.method !== "POST") {
+      res.statusCode = 405;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: "Invalid JSON body" }));
+      res.end(JSON.stringify({ error: "Method Not Allowed" }));
       return;
     }
-  }
 
-  const result = await handleTraceRequest(body);
-  res.statusCode = result.status;
-  res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify(result.data));
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        // fallback
+      }
+    }
+    if (!body || typeof body !== "object" || Object.keys(body).length === 0) {
+      try {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+        }
+        const raw = Buffer.concat(chunks).toString("utf-8");
+        if (raw) {
+          body = JSON.parse(raw);
+        }
+      } catch {
+        // stream may already be consumed
+      }
+    }
+
+    const result = await handleTraceRequest(body);
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(result.data));
+  } catch (err: any) {
+    console.error("[api/trace] Unhandled serverless error:", err);
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        error: `Trace serverless error: ${err?.message || String(err)}`,
+        fallback: true,
+      })
+    );
+  }
 }
