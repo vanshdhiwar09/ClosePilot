@@ -62,7 +62,7 @@ export function loadLocalEnv(rootDir?: string): Record<string, string> {
         value = value.substring(1, value.length - 1);
       }
 
-      if (key && process.env[key] === undefined) {
+      if (key && typeof process !== "undefined" && process.env && process.env[key] === undefined) {
         process.env[key] = value;
       }
       loadedVars[key] = value;

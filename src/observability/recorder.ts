@@ -139,9 +139,11 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
     super();
     loadLocalEnv();
     const hasExplicitKey = config?.apiKey !== undefined;
-    this.apiKey = hasExplicitKey
-      ? (config?.apiKey || "")
-      : process.env.NEATLOGS_API_KEY || process.env.NEATLOGS_KEY || "";
+    const envApiKey =
+      typeof process !== "undefined" && process.env
+        ? process.env.NEATLOGS_API_KEY || process.env.NEATLOGS_KEY || ""
+        : "";
+    this.apiKey = hasExplicitKey ? (config?.apiKey || "") : envApiKey;
     this.workflowName = config?.workflowName || "closepilot-investigation";
     this.project = config?.project || "ClosePilot";
     const isBrowser = typeof window !== "undefined";

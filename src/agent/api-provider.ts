@@ -25,11 +25,12 @@ export class ApiInvestigationModelProvider implements InvestigationModelProvider
     let endpoint = "/api/investigate";
     if (typeof window !== "undefined") {
       endpoint = "/api/investigate";
-    } else if (process.env.CLOSEPILOT_API_BASE_URL) {
+    } else if (typeof process !== "undefined" && process.env?.CLOSEPILOT_API_BASE_URL) {
       endpoint = `${process.env.CLOSEPILOT_API_BASE_URL}/api/investigate`;
     } else {
       // In headless Node test runs without a mock server or base URL, use deterministic fallback
-      return this.fallbackProvider.analyzeCase(prompt);
+      const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
+      return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
     }
 
     const controller = new AbortController();
@@ -50,7 +51,8 @@ export class ApiInvestigationModelProvider implements InvestigationModelProvider
         console.warn(
           `[ApiInvestigationModelProvider] Server responded with HTTP ${response.status}: ${errJson.error || "Unknown error"}. Falling back to deterministic provider.`
         );
-        return this.fallbackProvider.analyzeCase(prompt);
+        const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
+        return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
       }
 
       const data = await response.json();
@@ -59,7 +61,8 @@ export class ApiInvestigationModelProvider implements InvestigationModelProvider
         console.warn(
           `[ApiInvestigationModelProvider] Server indicated fallback: ${data.reason || data.error || "No API key"}. Using deterministic provider.`
         );
-        return this.fallbackProvider.analyzeCase(prompt);
+        const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
+        return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
       }
 
       return data as ModelAnalysisResponse;
@@ -67,7 +70,8 @@ export class ApiInvestigationModelProvider implements InvestigationModelProvider
       console.warn(
         `[ApiInvestigationModelProvider] Network or timeout error reaching /api/investigate: ${err.message}. Falling back to deterministic provider.`
       );
-      return this.fallbackProvider.analyzeCase(prompt);
+      const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
+      return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
     } finally {
       clearTimeout(timeoutId);
     }

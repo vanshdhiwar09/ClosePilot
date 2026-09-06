@@ -1,4 +1,18 @@
-# ClosePilot
+# 🧾 ClosePilot — Autonomous Month-End Reconciliation Agent
+
+<p align="center">
+  <a href="https://github.com/vanshdhiwar09/ClosePilot/actions/workflows/ci.yml"><img src="https://github.com/vanshdhiwar09/ClosePilot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Tests-246%20passing-brightgreen?logo=vitest&logoColor=white" alt="Tests">
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/Vite-5.x-646CFF?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Gemini-Live%20LLM-4285F4?logo=google&logoColor=white" alt="Gemini">
+  <img src="https://img.shields.io/badge/Agent%20Optimizer-AO%20Enabled-7C3AED?logo=robot&logoColor=white" alt="Agent Optimizer">
+  <img src="https://img.shields.io/badge/Neatlogs-Observability-FF6B35?logoColor=white" alt="Neatlogs">
+  <img src="https://img.shields.io/badge/Vercel-Deployed-000000?logo=vercel&logoColor=white" alt="Vercel">
+  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License">
+  <img src="https://img.shields.io/badge/Track-Autonomous%20CFO-8B5CF6?logoColor=white" alt="Track">
+</p>
 
 > **An autonomous month-end reconciliation agent that matches financial records, investigates discrepancies, resolves safe exceptions, escalates uncertain cases for human approval, and produces an evidence-backed close package.**
 
@@ -9,7 +23,6 @@
 | 🏆 **Track** | Autonomous Office of the CFO |
 | 📁 **Repository** | [github.com/vanshdhiwar09/ClosePilot](https://github.com/vanshdhiwar09/ClosePilot) |
 
-![CI](https://github.com/vanshdhiwar09/ClosePilot/actions/workflows/ci.yml/badge.svg)
 
 ---
 

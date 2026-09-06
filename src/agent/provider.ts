@@ -31,6 +31,7 @@ export type ModelAnalysisResponse = {
     total: number;
   };
   model?: string;
+  _modelProvider?: string;
   durationMs?: number;
 };
 

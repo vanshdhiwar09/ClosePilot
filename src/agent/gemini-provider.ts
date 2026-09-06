@@ -28,12 +28,15 @@ export class GeminiModelProvider implements InvestigationModelProvider {
   private readonly timeoutMs: number;
 
   constructor(config?: GeminiProviderConfig) {
+    const getEnv = (k: string) =>
+      typeof process !== "undefined" && process.env ? process.env[k] : undefined;
+
     this.apiKey =
       config?.apiKey ||
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
+      getEnv("GEMINI_API_KEY") ||
+      getEnv("GOOGLE_API_KEY") ||
       "";
-    this.model = config?.model || process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+    this.model = config?.model || getEnv("GEMINI_MODEL") || "gemini-flash-lite-latest";
     this.timeoutMs = config?.timeoutMs || 30_000;
     this.name = `gemini_rest_provider_${this.model}`;
   }
@@ -141,10 +144,13 @@ export function createInvestigationModelProvider(options?: {
   apiKey?: string;
   model?: string;
 }): InvestigationModelProvider {
+  const getEnv = (k: string) =>
+    typeof process !== "undefined" && process.env ? process.env[k] : undefined;
+
   const shouldUseLive =
     options?.useLiveLLM ??
-    (process.env.CLOSEPILOT_USE_LIVE_LLM === "true" &&
-      Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY));
+    (getEnv("CLOSEPILOT_USE_LIVE_LLM") === "true" &&
+      Boolean(getEnv("GEMINI_API_KEY") || getEnv("GOOGLE_API_KEY")));
 
   if (shouldUseLive) {
     return new GeminiModelProvider({
