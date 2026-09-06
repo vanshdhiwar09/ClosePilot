@@ -12,15 +12,7 @@
   },
   "rewrites": [
     {
-      "source": "/api/investigate",
-      "destination": "/api/investigate"
-    },
-    {
-      "source": "/api/trace",
-      "destination": "/api/trace"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

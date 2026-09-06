@@ -17,6 +17,13 @@ export default async function handler(
   }
 
   let body = req.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      // fallback
+    }
+  }
   if (!body) {
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
