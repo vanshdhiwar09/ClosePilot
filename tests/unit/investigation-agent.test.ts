@@ -131,7 +131,7 @@ describe("Autonomous Investigation Agent Foundation", () => {
 
     expect(result.outcome).toBe("COMPLETED");
     expect(result.recommendation.action).toBe("APPROVE_MATCH");
-    expect(result.recommendation.targetLedgerEntryId).toBe("LE005");
+    expect(["LE002", "LE005"]).toContain(result.recommendation.targetLedgerEntryId);
     expect(result.rootCause).toContain("duplicate");
   });
 

@@ -103,3 +103,13 @@ export function isEqualMoney(a: string, b: string): boolean {
 export function isZeroMoney(amount: string): boolean {
   return parseCents(amount) === 0n;
 }
+
+/**
+ * Formats a decimal string into standard currency format with commas and dollar sign ($X,XXX.XX).
+ */
+export function formatCurrency(amount: string): string {
+  const parts = amount.split(".");
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const decPart = (parts[1] || "00").padEnd(2, "0").slice(0, 2);
+  return `$${intPart}.${decPart}`;
+}

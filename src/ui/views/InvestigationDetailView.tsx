@@ -1,5 +1,4 @@
-// src/ui/views/InvestigationDetailView.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CaseInvestigationDetail, HumanReviewAction } from "../adapter/types";
 import { Card } from "../components/primitives/Card";
 import { Button } from "../components/primitives/Button";
@@ -7,8 +6,8 @@ import { Badge } from "../components/primitives/Badge";
 import { StatusPill, StatusPillVariant } from "../components/primitives/StatusPill";
 
 interface InvestigationDetailViewProps {
-  caseDetail: CaseInvestigationDetail;
   onBack: () => void;
+  caseDetail: CaseInvestigationDetail;
   onApplyAction: (
     caseId: string,
     action: HumanReviewAction,
@@ -27,6 +26,15 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
   const [selectedAction, setSelectedAction] = useState<HumanReviewAction | null>(
     allowedActions.length > 0 ? allowedActions[0] : null
   );
+
+  useEffect(() => {
+    if (allowedActions.length > 0 && (!selectedAction || !allowedActions.includes(selectedAction))) {
+      setSelectedAction(allowedActions[0]);
+    } else if (allowedActions.length === 0) {
+      setSelectedAction(null);
+    }
+  }, [allowedActions, selectedAction]);
+
   const [decisionReason, setDecisionReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);

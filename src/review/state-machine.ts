@@ -48,9 +48,39 @@ export const VALID_TRANSITIONS: Record<
  */
 export function canTransition(
   fromState: HumanReviewState,
-  action: HumanReviewAction
+  action: HumanReviewAction,
+  ctx?: CaseReviewContext
 ): boolean {
-  return Boolean(VALID_TRANSITIONS[fromState]?.[action]);
+  if (!VALID_TRANSITIONS[fromState]?.[action]) {
+    return false;
+  }
+  if (fromState === "REVIEW_REQUIRED" && action === "APPROVE" && ctx) {
+    if (caseRequiresEvidence(ctx)) {
+      const hasSupplied = ctx.decisionHistory.some((d) => d.action === "SUPPLY_EVIDENCE");
+      if (!hasSupplied) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Determines whether a case requires supporting evidence before it can be approved.
+ */
+export function caseRequiresEvidence(ctx: CaseReviewContext): boolean {
+  const hasMissingDoc = ctx.reconciliationOutput.exceptions.some(
+    (e) => e.type === "missing_documentation"
+  );
+  if (hasMissingDoc) return true;
+
+  if (
+    ctx.investigation?.recommendation?.action === "REQUEST_EVIDENCE" ||
+    (ctx.investigation?.recommendation?.requiredEvidenceTypes &&
+      ctx.investigation.recommendation.requiredEvidenceTypes.length > 0)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -122,6 +152,19 @@ export class HumanReviewSession {
    */
   public listCases(): Readonly<CaseReviewContext>[] {
     return Array.from(this.cases.keys()).map((id) => this.getCase(id));
+  }
+
+  /**
+   * Returns valid allowed actions for a case enforcing state machine constraints and evidence prerequisites.
+   */
+  public getAllowedActions(caseId: string): HumanReviewAction[] {
+    const ctx = this.getCase(caseId);
+    if (ctx.currentState === "RESOLVED" || ctx.currentState === "REJECTED" || ctx.isAutoResolved) {
+      return [];
+    }
+    const state = ctx.currentState as HumanReviewState;
+    const rawActions = Object.keys(VALID_TRANSITIONS[state] || {}) as HumanReviewAction[];
+    return rawActions.filter((action) => canTransition(state, action, ctx as CaseReviewContext));
   }
 
   /**
@@ -226,6 +269,18 @@ export class HumanReviewSession {
     } else if (params.action === "REQUEST_EVIDENCE") {
       ctx.outstandingEvidenceRequests.push(params.reason);
     } else if (params.action === "APPROVE") {
+      if (caseRequiresEvidence(ctx)) {
+        const hasSuppliedEvidence = ctx.decisionHistory.some((d) => d.action === "SUPPLY_EVIDENCE");
+        if (!hasSuppliedEvidence) {
+          throw new InvalidStateTransitionError(
+            params.caseId,
+            currentState,
+            params.action,
+            `Case requires evidence (e.g. missing documentation) and cannot be directly approved from REVIEW_REQUIRED. Required flow: REVIEW_REQUIRED -> REQUEST_EVIDENCE -> WAITING_FOR_EVIDENCE -> SUPPLY_EVIDENCE -> REVIEW_REQUIRED -> APPROVE -> RESOLVED.`
+          );
+        }
+      }
+
       if (ctx.outstandingEvidenceRequests.length > 0) {
         throw new InvalidStateTransitionError(
           params.caseId,
@@ -237,8 +292,17 @@ export class HumanReviewSession {
     }
 
     // Collect all evidence IDs associated with this decision
+    // For APPROVE, ensure all previously supplied/referenced evidence remains attached to the resulting decision record
+    const previouslySuppliedEvidenceIds = ctx.decisionHistory
+      .filter((d) => d.action === "SUPPLY_EVIDENCE")
+      .flatMap((d) => d.evidenceIds);
+
     const decisionEvidenceIds = Array.from(
-      new Set([...referencedEvidenceIds, ...newlyAddedEvidence.map((e) => e.id)])
+      new Set([
+        ...referencedEvidenceIds,
+        ...newlyAddedEvidence.map((e) => e.id),
+        ...previouslySuppliedEvidenceIds,
+      ])
     );
 
     // Build immutable decision record

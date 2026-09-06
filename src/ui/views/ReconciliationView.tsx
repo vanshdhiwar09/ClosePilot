@@ -32,25 +32,25 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({ onNaviga
             {
               rule: "exact_match_rule",
               desc: "Matches exact amount, currency, and normalized invoice reference within 0 date days.",
-              status: "Passed for BT001 (LE001)",
+              status: "Active (exact candidate match)",
               variant: "emerald" as const,
             },
             {
               rule: "timing_difference_rule",
               desc: "Detects amount & reference match with date variance (up to 30 calendar days).",
-              status: "Triggered for BT004 (LE001, 1 day variance)",
+              status: "Active (date tolerance window)",
               variant: "amber" as const,
             },
             {
               rule: "duplicate_detection_rule",
               desc: "Flags potential multiple postings sharing identical amounts, dates, or vendor tokens.",
-              status: "Triggered for BT005 (Duplicate of BT002)",
+              status: "Active (candidate duplicate cluster)",
               variant: "rose" as const,
             },
             {
               rule: "missing_documentation_guard",
-              desc: "Enforces invoice/receipt proof before approval for transactions > $500.",
-              status: "Triggered for BT006 (Missing SD003)",
+              desc: "Enforces invoice/receipt proof before approval for corporate transactions.",
+              status: "Active (documentation required)",
               variant: "rose" as const,
             },
           ].map((r) => (

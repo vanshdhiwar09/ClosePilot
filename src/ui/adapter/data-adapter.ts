@@ -28,8 +28,10 @@ import {
   EvidenceDetailViewModel,
   PolicyGuardrailViewModel,
   DecisionHistoryViewModel,
+  EvidenceDocumentViewModel,
   HumanReviewState,
 } from "./types";
+import { EvidenceItem } from "../../schemas/evidence-item";
 
 /**
  * Maps machine exception types into human-friendly finance operations labels.
@@ -173,7 +175,7 @@ export function buildOverviewViewModel(state: SharedWorkflowState): OverviewData
     },
     kpis: {
       agreementAccuracy: agreementAccuracyStr,
-      agreementDetail: "8/8 verified agreement with ground truth",
+      agreementDetail: `${evalReport.metrics.totalAgreements}/${evalReport.metrics.totalCases} verified agreement with ground truth`,
       falseAutoCloseRate: falseAutoCloseStr,
       falseAutoCloseDetail: "Zero false closures",
       autoResolvedCount: summary.automaticallyResolvedCases,
@@ -217,7 +219,7 @@ export function getExceptionCases(state: SharedWorkflowState): ExceptionCaseSumm
     const formattedAmount = formatCurrencyString(c.bankTransaction.amount);
     const exception = c.reconciliationOutput.exceptions[0];
     const investigation = c.investigation;
-    const isFlagship = c.bankTransaction.id === "BT007";
+    const isFlagship = c.reconciliationOutput.exceptions.some((e) => e.type === "potential_anomaly") || c.investigation?.riskLevel === "CRITICAL";
 
     const exceptionType = exception?.type || (c.candidateLedgerEntries.length > 1 ? "ambiguous" : undefined);
     const exceptionLabel = getExceptionLabel(exceptionType);
@@ -271,7 +273,7 @@ export function getCaseInvestigationDetail(
   const rawAmountNum = parseFloat(ctx.bankTransaction.amount);
   const formattedAmount = formatCurrencyString(ctx.bankTransaction.amount);
   const exception = ctx.reconciliationOutput.exceptions[0];
-  const isFlagship = ctx.bankTransaction.id === "BT007";
+  const isFlagship = ctx.reconciliationOutput.exceptions.some((e) => e.type === "potential_anomaly") || ctx.investigation?.riskLevel === "CRITICAL";
 
   const exceptionType = exception?.type || (ctx.candidateLedgerEntries.length > 1 ? "ambiguous" : undefined);
   const exceptionLabel = getExceptionLabel(exceptionType);
@@ -403,9 +405,8 @@ export function getCaseInvestigationDetail(
     toState: d.newState,
   }));
 
-  // Allowed actions based on current state in domain state machine
-  const rawTransitions = VALID_TRANSITIONS[reviewStatus as keyof typeof VALID_TRANSITIONS] || {};
-  const allowedActions = Object.keys(rawTransitions) as HumanReviewAction[];
+  // Allowed actions based on domain state machine and evidence prerequisites
+  const allowedActions = workflowResult.session.getAllowedActions(caseId);
 
   return {
     summary,
@@ -453,6 +454,8 @@ export function executeReviewAction(
     action: HumanReviewAction;
     reason: string;
     reviewer?: Reviewer;
+    evidenceIds?: string[];
+    newEvidence?: EvidenceItem[];
   }
 ): HumanReviewDecision {
   const { workflowResult } = state;
@@ -464,16 +467,76 @@ export function executeReviewAction(
     role: "Senior Finance Controller",
   };
 
+  // If action is SUPPLY_EVIDENCE and neither newEvidence nor evidenceIds were provided,
+  // automatically create a synthetic audited supporting document evidence item
+  let newEvidence = params.newEvidence;
+  if (params.action === "SUPPLY_EVIDENCE" && (!newEvidence || newEvidence.length === 0) && (!params.evidenceIds || params.evidenceIds.length === 0)) {
+    const ctx = session.getCase(params.caseId);
+    const ref = ctx.bankTransaction.reference || "DOC-REF";
+    const syntheticDocEvidence: EvidenceItem = {
+      id: `EVD-DOC-${params.caseId}-${Date.now()}`,
+      kind: "document",
+      subjectType: "result",
+      subjectId: params.caseId,
+      sourceId: `SD-${params.caseId}`,
+      payload: {
+        documentType: "invoice",
+        fileName: `invoice-${ref.toLowerCase()}.pdf`,
+        description: `Verified invoice/receipt documentation for reference ${ref}`,
+        suppliedAt: new Date().toISOString(),
+      },
+      createdAt: new Date().toISOString(),
+    };
+    newEvidence = [syntheticDocEvidence];
+  }
+
   // 1. Call pure domain state machine
   const decision = session.applyAction({
     caseId: params.caseId,
     action: params.action,
     reviewer,
     reason: params.reason,
+    evidenceIds: params.evidenceIds,
+    newEvidence,
   });
 
   // 2. Regenerate ClosePackage from updated session
   workflowResult.closePackage = generateClosePackage(session);
 
   return decision;
+}
+
+/**
+ * Extracts real supporting documents from the reconciliation workflow fixture and links them to cases.
+ */
+export function getEvidenceDocuments(state: SharedWorkflowState): EvidenceDocumentViewModel[] {
+  const { workflowResult } = state;
+  const fixtureDocs = (fixtureJson as any).documents || [];
+  const cases = workflowResult.closePackage.cases;
+
+  return fixtureDocs.map((doc: any) => {
+    // Find all cases linked to this document
+    const linkedCases: string[] = [];
+    for (const c of cases) {
+      const hasDocInEvidence = c.evidence.some(
+        (ev) => ev.kind === "document" && (ev.sourceId === doc.id || (ev.payload as any)?.id === doc.id)
+      );
+      const hasDocInCandidates = c.candidateLedgerEntries.some((le) =>
+        le.documentIds && le.documentIds.includes(doc.id)
+      );
+      if (hasDocInEvidence || hasDocInCandidates) {
+        linkedCases.push(c.caseId);
+      }
+    }
+
+    return {
+      id: doc.id,
+      name: doc.fileName,
+      vendor: doc.vendor || "General / Corporate",
+      amount: doc.amount ? formatCurrencyString(doc.amount) : "N/A",
+      date: doc.documentDate || "2024-01-30",
+      type: doc.documentType,
+      linkedCases: Array.from(new Set(linkedCases)),
+    };
+  });
 }

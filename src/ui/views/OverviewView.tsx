@@ -89,9 +89,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
         <MetricCard
           label="Agreement Accuracy"
           value={kpis.agreementAccuracy}
-          detail="8/8 cases agreeing with ground truth"
-          badgeText="100% Fidelity"
-          badgeVariant="emerald"
+          detail={kpis.agreementDetail}
+          badgeText={`${kpis.agreementAccuracy} Fidelity`}
+          badgeVariant={kpis.agreementAccuracy === "100.0%" ? "emerald" : "amber"}
           icon={
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>

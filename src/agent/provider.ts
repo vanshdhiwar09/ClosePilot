@@ -1,7 +1,5 @@
-// src/agent/provider.ts
-// Model provider abstraction and deterministic benchmark provider for ClosePilot investigation.
-// Pluggable interface: isolates LLM/model access behind an explicit contract without hardcoding vendor SDKs or secrets.
-
+import { calculateDateDifferenceDays } from "../reconciliation/date";
+import { formatCurrency } from "../utils/money";
 import {
   CaseDetail,
   InvestigationConfidence,
@@ -35,8 +33,8 @@ export interface InvestigationModelProvider {
 }
 
 /**
- * Deterministic model provider grounded in accounting domain rules and fixture labels.
- * Produces structured analysis responses without external network calls.
+ * Deterministic model provider grounded in accounting domain rules.
+ * Produces structured analysis responses derived dynamically from case details and evidence.
  */
 export class DeterministicMockProvider implements InvestigationModelProvider {
   public readonly name = "deterministic_accounting_model_v1";
@@ -45,6 +43,10 @@ export class DeterministicMockProvider implements InvestigationModelProvider {
     const { caseDetail } = prompt;
     const exceptions = caseDetail.exceptions.map((e) => e.type);
     const availableEvidenceIds = caseDetail.evidence.map((e) => e.id);
+    const bankTx = caseDetail.bankTransaction;
+    const candidates = caseDetail.candidateLedgerEntries;
+    const candidateIds = candidates.map((e) => e.id);
+    const primaryCandidate = candidates[0];
 
     // Auto-resolved bypass
     if (caseDetail.autoResolutionAllowed && exceptions.length === 0) {
@@ -60,93 +62,101 @@ export class DeterministicMockProvider implements InvestigationModelProvider {
       };
     }
 
-    // BT002: Unmatched transaction
+    // Unmatched transaction
     if (exceptions.includes("unmatched_transaction")) {
       return {
-        summary: `Bank transaction ${caseDetail.bankTransaction.id} ($${caseDetail.bankTransaction.amount}) has no matching ledger entry.`,
-        rootCause: `No candidate entry found in account ${caseDetail.bankTransaction.accountId} matching counterparty ${caseDetail.bankTransaction.counterparty || caseDetail.bankTransaction.description}.`,
+        summary: `Bank transaction ${bankTx.id} ($${bankTx.amount}) has no matching ledger entry.`,
+        rootCause: `No candidate entry found in account ${bankTx.accountId} matching counterparty ${bankTx.counterparty || bankTx.description}.`,
         reasoning: [
-          "Scanned all ledger entries in account; zero matching records found.",
+          `Scanned all ledger entries in account ${bankTx.accountId}; zero matching records found.`,
           "Rule account_currency_filter failed to find any candidate.",
         ],
         recommendedAction: "MANUAL_ENTRY_REQUIRED",
-        suggestedReason: "Book manual adjusting ledger entry or contact counterparty to confirm payment allocation.",
+        suggestedReason: `Book manual adjusting ledger entry or contact counterparty to confirm payment allocation for ${bankTx.id}.`,
         confidence: "HIGH",
         riskLevel: "HIGH",
         citedEvidenceIds: availableEvidenceIds,
       };
     }
 
-    // BT003: Amount mismatch
+    // Amount mismatch
     if (exceptions.includes("amount_mismatch")) {
-      const candidateId = caseDetail.candidateLedgerEntries[0]?.id;
+      const candidateId = primaryCandidate?.id;
+      const amountDiff = caseDetail.reconciliationResult.amountDifference;
+      const ref = bankTx.reference || primaryCandidate?.reference || "N/A";
       return {
-        summary: `Bank transaction ${caseDetail.bankTransaction.id} ($${caseDetail.bankTransaction.amount}) has an amount discrepancy against candidate ${candidateId}.`,
-        rootCause: `Reference and dates match, but bank amount ($${caseDetail.bankTransaction.amount}) differs from ledger debit/credit ($${caseDetail.reconciliationResult.amountDifference} variance).`,
+        summary: `Bank transaction ${bankTx.id} ($${bankTx.amount}) has an amount discrepancy against candidate ${candidateId || "entry"}.`,
+        rootCause: `Reference and dates match, but bank amount ($${bankTx.amount}) differs from ledger debit/credit ($${amountDiff} variance).`,
         reasoning: [
-          "Candidate matches on reference INV-003 and date window.",
-          `Deterministic variance calculated: $${caseDetail.reconciliationResult.amountDifference}.`,
+          `Candidate matches on reference ${ref} within the active date window.`,
+          `Deterministic variance calculated: $${amountDiff}.`,
         ],
         recommendedAction: "PRICE_ADJUSTMENT_REQUIRED",
         targetLedgerEntryId: candidateId,
-        suggestedReason: "Investigate $250.00 price discrepancy with vendor and book credit memo.",
+        suggestedReason: `Investigate $${amountDiff} price discrepancy with vendor and book adjusting credit memo.`,
         confidence: "HIGH",
         riskLevel: "MEDIUM",
         citedEvidenceIds: availableEvidenceIds,
       };
     }
 
-    // BT004: Timing difference
+    // Timing difference
     if (exceptions.includes("timing_difference")) {
-      const candidateId = caseDetail.candidateLedgerEntries[0]?.id;
+      const candidateId = primaryCandidate?.id;
+      const dateDiff = primaryCandidate
+        ? calculateDateDifferenceDays(bankTx.transactionDate, primaryCandidate.entryDate)
+        : 1;
+      const daysText = `${dateDiff} day${dateDiff === 1 ? "" : "s"}`;
       return {
-        summary: `Bank transaction ${caseDetail.bankTransaction.id} matches candidate ${candidateId} outside the exact same-day window.`,
-        rootCause: "Bank transaction date and ledger entry date differ by 1 day (timing clearance difference).",
+        summary: `Bank transaction ${bankTx.id} matches candidate ${candidateId || "entry"} outside the exact same-day window.`,
+        rootCause: `Bank transaction date and ledger entry date differ by ${daysText} (timing clearance difference).`,
         reasoning: [
-          "Exact amount and normalized reference match candidate LE001.",
-          "Timing difference of 1 day is within policy clearing tolerance.",
+          `Exact amount and normalized reference match candidate ${candidateId || ""}.`,
+          `Timing difference of ${daysText} is within policy clearing tolerance.`,
         ],
         recommendedAction: "APPROVE_MATCH",
         targetLedgerEntryId: candidateId,
-        suggestedReason: "1-day timing clearance difference is acceptable under month-end reconciliation policy.",
+        suggestedReason: `${daysText} timing clearance difference is acceptable under month-end reconciliation policy.`,
         confidence: "HIGH",
         riskLevel: "LOW",
         citedEvidenceIds: availableEvidenceIds,
       };
     }
 
-    // BT005: Duplicate candidates
+    // Duplicate candidates
     if (exceptions.includes("duplicate")) {
-      const candidateIds = caseDetail.candidateLedgerEntries.map((e) => e.id);
+      const primaryId = candidateIds[0] || "primary";
+      const dupIds = candidateIds.slice(1).join(", ");
       return {
-        summary: `Bank transaction ${caseDetail.bankTransaction.id} matched multiple duplicate candidates [${candidateIds.join(", ")}].`,
+        summary: `Bank transaction ${bankTx.id} matched multiple duplicate candidates [${candidateIds.join(", ")}].`,
         rootCause: "Identical amount and normalized reference posted multiple times in general ledger (duplicate cluster).",
         reasoning: [
-          "Deterministic duplicate detector identified LE005 and LE006 as a duplicate cluster.",
+          `Deterministic duplicate detector identified [${candidateIds.join(", ")}] as a duplicate cluster.`,
           "One ledger entry must be matched and the duplicate voided in the subledger.",
         ],
         recommendedAction: "APPROVE_MATCH",
-        targetLedgerEntryId: candidateIds[0] || "LE005",
-        suggestedReason: "Approve match with primary entry LE005 and void duplicate subledger entry LE006.",
+        targetLedgerEntryId: primaryId,
+        suggestedReason: `Approve match with primary entry ${primaryId} and void duplicate subledger entry ${dupIds || primaryId}.`,
         confidence: "HIGH",
         riskLevel: "MEDIUM",
         citedEvidenceIds: availableEvidenceIds,
       };
     }
 
-    // BT006: Missing documentation
+    // Missing documentation
     if (exceptions.includes("missing_documentation")) {
-      const candidateId = caseDetail.candidateLedgerEntries[0]?.id;
+      const candidateId = primaryCandidate?.id;
+      const ref = bankTx.reference || primaryCandidate?.reference || "transaction";
       return {
-        summary: `Candidate entry ${candidateId} matching bank transaction ${caseDetail.bankTransaction.id} lacks required supporting documentation.`,
-        rootCause: "Ledger entry LE004 has no linked supporting document or valid invoice metadata.",
+        summary: `Candidate entry ${candidateId || "record"} matching bank transaction ${bankTx.id} lacks required supporting documentation.`,
+        rootCause: `Ledger entry ${candidateId || "record"} has no linked supporting document or valid invoice metadata.`,
         reasoning: [
-          "Amount and reference match candidate LE004.",
+          `Amount and reference match candidate ${candidateId || ""}.`,
           "Audit policy requires invoice or receipt verification for corporate expenses.",
         ],
         recommendedAction: "REQUEST_EVIDENCE",
         targetLedgerEntryId: candidateId,
-        suggestedReason: "Request vendor invoice or receipt REC-2024-003 from Accounts Payable.",
+        suggestedReason: `Request vendor invoice or receipt for reference ${ref} from Accounts Payable.`,
         requiredEvidenceTypes: ["invoice", "receipt"],
         confidence: "HIGH",
         riskLevel: "MEDIUM",
@@ -154,44 +164,45 @@ export class DeterministicMockProvider implements InvestigationModelProvider {
       };
     }
 
-    // BT007: Potential anomaly
+    // Potential anomaly
     if (exceptions.includes("potential_anomaly")) {
-      const candidateId = caseDetail.candidateLedgerEntries[0]?.id;
+      const candidateId = primaryCandidate?.id;
       const calcEvidence = caseDetail.evidence.find(
         (e) => (e.payload as any)?.calculationType === "anomaly_threshold"
       );
       const calcReason = (calcEvidence?.payload as any)?.reason;
+      const thresholdFormatted = (calcEvidence?.payload as any)?.accountThreshold;
+      const formattedAmount = formatCurrency(bankTx.amount);
       const rootCause = calcReason
-        ? `Amount $15,000.00 is a statistical outlier: ${calcReason}`
-        : "Amount $15,000.00 is a statistical outlier exceeding the account anomaly threshold ($6,250.00, computed as 5x median $1,250.00).";
+        ? `Amount ${formattedAmount} is a statistical outlier: ${calcReason}`
+        : `Amount ${formattedAmount} is a statistical outlier exceeding the account anomaly threshold${thresholdFormatted ? ` (${thresholdFormatted})` : ""}.`;
 
       return {
-        summary: `Transaction ${caseDetail.bankTransaction.id} for $${caseDetail.bankTransaction.amount} exceeds account statistical threshold.`,
+        summary: `Transaction ${bankTx.id} for ${formattedAmount} exceeds account statistical threshold.`,
         rootCause,
         reasoning: [
-          "Reference and dates align with entry LE009, but deterministic anomaly detector triggered.",
+          `Reference and dates align with candidate ${candidateId || "record"}, but deterministic anomaly detector triggered.`,
           "High-value transaction requires controller authorization.",
         ],
         recommendedAction: "ESCALATE_TO_MANAGEMENT",
         targetLedgerEntryId: candidateId,
-        suggestedReason: "Escalate $15,000.00 capital equipment expenditure to financial controller for authorization.",
+        suggestedReason: `Escalate ${formattedAmount} expenditure to financial controller for authorization.`,
         confidence: "HIGH",
         riskLevel: "CRITICAL",
         citedEvidenceIds: availableEvidenceIds,
       };
     }
 
-    // BT008: Ambiguous candidates
-    const candidateIds = caseDetail.candidateLedgerEntries.map((e) => e.id);
+    // Ambiguous candidates
     return {
-      summary: `Transaction ${caseDetail.bankTransaction.id} has multiple qualifying candidates [${candidateIds.join(", ")}].`,
+      summary: `Transaction ${bankTx.id} has multiple qualifying candidates [${candidateIds.join(", ")}].`,
       rootCause: "Multiple ledger entries share identical amounts, references, and dates.",
       reasoning: [
-        "Candidate entries LE008a and LE008b compete equally.",
+        `Candidate entries [${candidateIds.join(", ")}] compete equally.`,
         "System cannot autonomously disambiguate without reviewer judgment.",
       ],
       recommendedAction: "ESCALATE_TO_MANAGEMENT",
-      suggestedReason: "Human reviewer disambiguation required to select between candidate entries LE008a and LE008b.",
+      suggestedReason: `Human reviewer disambiguation required to select between candidate entries [${candidateIds.join(", ")}].`,
       confidence: "MEDIUM",
       riskLevel: "HIGH",
       citedEvidenceIds: availableEvidenceIds,

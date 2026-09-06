@@ -43,7 +43,7 @@ export const ClosePackageView: React.FC<ClosePackageViewProps> = ({ data, onNavi
           gap: "16px",
         }}
       >
-        <Card title="Close Package Metadata" subtitle="Cryptographically linked to period 2024.1">
+        <Card title="Close Package Metadata" subtitle="Evidence-linked to period 2024.1">
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "13px" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--cp-text-secondary)" }}>Accounting Period:</span>
@@ -60,7 +60,7 @@ export const ClosePackageView: React.FC<ClosePackageViewProps> = ({ data, onNavi
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--cp-text-secondary)" }}>Audit Traceability:</span>
               <Badge variant="emerald" size="sm">
-                100% Verified
+                Evidence-Linked
               </Badge>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>

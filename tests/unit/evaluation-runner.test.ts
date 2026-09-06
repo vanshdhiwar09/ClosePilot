@@ -20,10 +20,10 @@ describe("Evaluation Runner & Report Formatter", () => {
     expect(report.caseResults).toHaveLength(8);
     expect(report.metrics.totalCases).toBe(8);
 
-    // 100% agreement on baseline
-    expect(report.metrics.totalAgreements).toBe(8);
-    expect(report.metrics.totalDisagreements).toBe(0);
-    expect(report.metrics.accuracy).toBe(1.0);
+    // Truthful metrics without fixture tuning: 6 agreements, 2 candidate discrepancies
+    expect(report.metrics.totalAgreements).toBe(6);
+    expect(report.metrics.totalDisagreements).toBe(2);
+    expect(report.metrics.accuracy).toBe(0.75);
 
     // Specific metrics verification
     expect(report.metrics.autoReconciliationRate).toBe(1.0); // 1 eligible auto-resolved
@@ -36,19 +36,9 @@ describe("Evaluation Runner & Report Formatter", () => {
     expect(report.metrics.processingTime.totalDurationMs).toBeGreaterThan(0);
     expect(report.metrics.processingTime.averageDurationPerCaseMs).toBeGreaterThan(0);
 
-    // Zero failures on baseline
-    expect(report.failures).toHaveLength(0);
-
-    // Check individual case records
-    for (const res of report.caseResults) {
-      expect(res.isAgreement).toBe(true);
-      expect(res.statusMatch).toBe(true);
-      expect(res.candidateMatch).toBe(true);
-      expect(res.exceptionMatch).toBe(true);
-      expect(res.autoResolutionMatch).toBe(true);
-      expect(res.durationMs).toBeGreaterThan(0);
-      expect(res.failure).toBeUndefined();
-    }
+    // 2 failure diagnostics on candidate mismatches (EC005 and EC007)
+    expect(report.failures).toHaveLength(2);
+    expect(report.failures.map((f) => f.caseId).sort()).toEqual(["EC005", "EC007"]);
   });
 
   it("formats evaluation report into readable markdown with metrics and breakdown", () => {
@@ -64,7 +54,8 @@ describe("Evaluation Runner & Report Formatter", () => {
     expect(formatted).toContain("0.0%");
     expect(formatted).toContain("Human Review Load");
     expect(formatted).toContain("87.5%");
-    expect(formatted).toContain("Zero Disagreements");
+    expect(formatted).toContain("Overall Agreement Accuracy");
+    expect(formatted).toContain("75.0%");
     expect(formatted).toContain("BT001");
     expect(formatted).toContain("BT008");
   });

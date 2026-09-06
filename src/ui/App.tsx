@@ -9,6 +9,7 @@ import {
   getExceptionCases,
   getCaseInvestigationDetail,
   executeReviewAction,
+  getEvidenceDocuments,
   SharedWorkflowState,
 } from "./adapter/data-adapter";
 import { OverviewView } from "./views/OverviewView";
@@ -188,7 +189,12 @@ export const App: React.FC = () => {
               onNavigate={setCurrentTab}
             />
           )}
-          {currentTab === "evidence" && <EvidenceView onNavigate={setCurrentTab} />}
+          {currentTab === "evidence" && (
+            <EvidenceView
+              onNavigate={setCurrentTab}
+              documents={getEvidenceDocuments(sharedState)}
+            />
+          )}
           {currentTab === "close-package" && <ClosePackageView data={overviewData} onNavigate={setCurrentTab} />}
         </>
       )}

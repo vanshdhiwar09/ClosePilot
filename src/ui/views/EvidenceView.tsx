@@ -1,63 +1,16 @@
-// src/ui/views/EvidenceView.tsx
 import React from "react";
 import { Card } from "../components/primitives/Card";
 import { Badge } from "../components/primitives/Badge";
 import { Button } from "../components/primitives/Button";
 import { NavTabId } from "../components/layout/AppSidebar";
+import { EvidenceDocumentViewModel } from "../adapter/types";
 
 interface EvidenceViewProps {
   onNavigate: (tab: NavTabId) => void;
+  documents?: EvidenceDocumentViewModel[];
 }
 
-export const EvidenceView: React.FC<EvidenceViewProps> = ({ onNavigate }) => {
-  const documents = [
-    {
-      id: "SD001",
-      name: "invoice-vendor-a-001.pdf",
-      vendor: "Vendor A",
-      amount: "$1,250.00",
-      date: "2024-01-15",
-      type: "invoice",
-      linkedCases: ["EC001", "EC004"],
-    },
-    {
-      id: "SD002",
-      name: "invoice-vendor-b-002.pdf",
-      vendor: "Vendor B",
-      amount: "$1,850.00",
-      date: "2024-01-12",
-      type: "invoice",
-      linkedCases: ["EC002"],
-    },
-    {
-      id: "SD004",
-      name: "invoice-vendor-c-004.pdf",
-      vendor: "Vendor C",
-      amount: "$3,100.00",
-      date: "2024-01-18",
-      type: "invoice",
-      linkedCases: ["EC005"],
-    },
-    {
-      id: "SD005",
-      name: "invoice-vendor-d-005.pdf",
-      vendor: "Vendor D",
-      amount: "$15,000.00",
-      date: "2024-01-20",
-      type: "contract_receipt",
-      linkedCases: ["EC007"],
-    },
-    {
-      id: "SD006",
-      name: "invoice-vendor-e-006.pdf",
-      vendor: "Vendor E",
-      amount: "$2,400.00",
-      date: "2024-01-22",
-      type: "invoice",
-      linkedCases: ["EC008"],
-    },
-  ];
-
+export const EvidenceView: React.FC<EvidenceViewProps> = ({ onNavigate, documents = [] }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -67,11 +20,11 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({ onNavigate }) => {
               Supporting Evidence Locker
             </h1>
             <Badge variant="neutral" size="sm">
-              5 Ingested Documents
+              {documents.length} Ingested Documents
             </Badge>
           </div>
           <p style={{ fontSize: "13px", color: "var(--cp-text-secondary)", marginTop: "4px" }}>
-            Cryptographically verified supporting documents linked to reconciliation exceptions.
+            Evidence-linked supporting documents verified from reconciliation workflow.
           </p>
         </div>
         <Button variant="outline" size="md" onClick={() => onNavigate("overview")}>
@@ -146,7 +99,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({ onNavigate }) => {
                 <div>
                   <div style={{ fontSize: "13px", fontWeight: 600 }}>{doc.name}</div>
                   <div style={{ fontSize: "11px", color: "var(--cp-text-secondary)" }}>
-                    {doc.vendor} · Date: {doc.date} · Linked Cases: {doc.linkedCases.join(", ")}
+                    {doc.vendor !== "General / Corporate" ? `${doc.vendor} · ` : ""}Date: {doc.date} · Linked Cases: {doc.linkedCases.length > 0 ? doc.linkedCases.join(", ") : "General reference"}
                   </div>
                 </div>
               </div>

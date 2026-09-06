@@ -189,3 +189,13 @@ export type CaseInvestigationDetail = {
   decisionHistory: DecisionHistoryViewModel[];
   allowedActions: HumanReviewAction[];
 };
+
+export interface EvidenceDocumentViewModel {
+  id: string;
+  name: string;
+  vendor: string;
+  amount: string;
+  date: string;
+  type: string;
+  linkedCases: string[];
+}

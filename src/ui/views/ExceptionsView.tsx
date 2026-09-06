@@ -131,7 +131,7 @@ export const ExceptionsView: React.FC<ExceptionsViewProps> = ({
             </div>
 
             <p style={{ fontSize: "13px", color: "var(--cp-text-secondary)", marginTop: "4px", lineHeight: 1.4 }}>
-              Statistical anomaly flagged: Capital expenditure exceeds account median by &gt;3x. Agent completed deep investigation with {flagshipCase.toolCallsCount} tool executions, validated against safety policies, and escalated for controller authorization.
+              {flagshipCase.recommendationReason || `Statistical anomaly flagged: Expenditure exceeds account median baseline. Agent completed deep investigation with ${flagshipCase.toolCallsCount} tool executions, validated against safety policies, and escalated for controller authorization.`}
             </p>
           </div>
 
@@ -147,7 +147,7 @@ export const ExceptionsView: React.FC<ExceptionsViewProps> = ({
                 </svg>
               }
             >
-              Investigate BT007
+              Investigate {flagshipCase.bankTxId}
             </Button>
             <span style={{ fontSize: "11px", color: "var(--cp-text-muted)" }}>
               Recommended: {flagshipCase.recommendationAction}

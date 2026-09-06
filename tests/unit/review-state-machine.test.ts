@@ -417,4 +417,98 @@ describe("Human Review State Machine", () => {
     expect(input.reconciliationOutput.result.status).toBe(originalResultStatus);
     expect(input.reconciliationOutput.evidence).toHaveLength(originalEvidenceCount);
   });
+
+  it("enforces evidence-first approval: cases with missing_documentation cannot be directly approved from REVIEW_REQUIRED", () => {
+    // Create case with missing_documentation exception
+    const mockCase: CaseReviewInput = {
+      caseId: "C_MISSING",
+      bankTransaction: createMockBankTx("BT_MISSING"),
+      reconciliationOutput: {
+        result: createMockResult("C_MISSING", "BT_MISSING"),
+        exceptions: [
+          {
+            id: "EXC-MD-1",
+            resultId: "RES-C_MISSING",
+            type: "missing_documentation",
+            severity: "high",
+            status: "open",
+            reasonCode: "MISSING_INVOICE",
+            evidenceIds: ["EVD-001"],
+            createdAt: "2024-01-15T00:00:00Z",
+          },
+        ],
+        evidence: [
+          {
+            id: "EVD-001",
+            kind: "source_record",
+            subjectType: "result",
+            subjectId: "RES-C_MISSING",
+            payload: { source: "bank_feed" },
+            createdAt: "2024-01-15T00:00:00Z",
+          },
+        ],
+        autoResolutionAllowed: false,
+      },
+    };
+
+    const session = new HumanReviewSession([mockCase]);
+
+    // Initial allowed actions should NOT include APPROVE
+    const initialActions = session.getAllowedActions("C_MISSING");
+    expect(initialActions).not.toContain("APPROVE");
+    expect(initialActions).toContain("REQUEST_EVIDENCE");
+    expect(initialActions).toContain("REJECT");
+
+    // Attempting direct APPROVE from REVIEW_REQUIRED must throw
+    expect(() =>
+      session.applyAction({
+        caseId: "C_MISSING",
+        action: "APPROVE",
+        reviewer: { id: "REV-01" },
+        reason: "Direct approval without documentation",
+      })
+    ).toThrow(InvalidStateTransitionError);
+
+    // Step 1: REQUEST_EVIDENCE -> WAITING_FOR_EVIDENCE
+    session.applyAction({
+      caseId: "C_MISSING",
+      action: "REQUEST_EVIDENCE",
+      reviewer: { id: "REV-01" },
+      reason: "Requesting vendor invoice",
+    });
+    expect(session.getCase("C_MISSING").currentState).toBe("WAITING_FOR_EVIDENCE");
+
+    // Step 2: SUPPLY_EVIDENCE -> REVIEW_REQUIRED
+    const suppliedDoc = createAuditEvidenceItem({
+      caseId: "C_MISSING",
+      description: "Vendor invoice supplied",
+      kind: "document",
+      payload: { invoiceNo: "INV-999" },
+    });
+
+    session.applyAction({
+      caseId: "C_MISSING",
+      action: "SUPPLY_EVIDENCE",
+      reviewer: { id: "REV-02" },
+      reason: "Invoice INV-999 supplied",
+      newEvidence: [suppliedDoc],
+    });
+    expect(session.getCase("C_MISSING").currentState).toBe("REVIEW_REQUIRED");
+
+    // Now allowed actions DOES include APPROVE
+    const postSupplyActions = session.getAllowedActions("C_MISSING");
+    expect(postSupplyActions).toContain("APPROVE");
+
+    // Step 3: APPROVE -> RESOLVED
+    const approveDecision = session.applyAction({
+      caseId: "C_MISSING",
+      action: "APPROVE",
+      reviewer: { id: "REV-01" },
+      reason: "Invoice verified and approved",
+    });
+
+    expect(approveDecision.newState).toBe("RESOLVED");
+    // Supplied evidence must remain attached to resulting decision record
+    expect(approveDecision.evidenceIds).toContain(suppliedDoc.id);
+  });
 });

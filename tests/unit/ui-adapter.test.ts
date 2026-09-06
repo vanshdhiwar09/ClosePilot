@@ -19,8 +19,9 @@ describe("Phase 7A Frontend Data Adapter", () => {
     expect(data.period.periodId).toBe("2024.1");
     expect(data.period.activeStep).toBe("investigate");
 
-    // Verified KPI checks
-    expect(data.kpis.agreementAccuracy).toBe("100.0%");
+    // Verified KPI checks (reflecting truthful evaluation metrics without fixture-tuning)
+    expect(data.kpis.agreementAccuracy).toBe("75.0%");
+    expect(data.kpis.agreementDetail).toBe("6/8 verified agreement with ground truth");
     expect(data.kpis.falseAutoCloseRate).toBe("0.0%");
     expect(data.kpis.autoResolvedCount).toBe(1);
     expect(data.kpis.autoResolvedAmount).toBe("$1,250.00"); // BT001 exact match amount

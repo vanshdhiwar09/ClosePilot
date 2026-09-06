@@ -70,17 +70,7 @@ export function reconcileBankTransaction(
   const resultId = `RES-${bankTx.id}`;
   const createdAt = new Date().toISOString();
 
-  // Filter ledger entries for special fixture disambiguation:
-  // 1. For BT005 (INV-005), the ground truth duplicate pair is LE005 & LE006 (memo "(duplicate date)").
-  //    Exclude LE002 which has a different memo and document.
-  // 2. For BT007 (LARGE-001), the ground truth anomaly candidate is LE009.
-  //    Exclude LE007 which was an initial draft entry with SD005 attached.
-  let eligibleEntries = ledgerEntries;
-  if (bankTx.id === "BT005") {
-    eligibleEntries = ledgerEntries.filter((e) => e.id !== "LE002");
-  } else if (bankTx.id === "BT007") {
-    eligibleEntries = ledgerEntries.filter((e) => e.id !== "LE007");
-  }
+  const eligibleEntries = ledgerEntries;
 
   // Step 1: Deterministic candidate matching
   const matchResult = matchBankTransaction(bankTx, eligibleEntries, context.matcherConfig);
