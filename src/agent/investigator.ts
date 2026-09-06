@@ -342,7 +342,7 @@ export class AutonomousInvestigator {
       investigationSummary: modelResponse.summary,
       rootCause: modelResponse.rootCause,
       evidenceIds: modelResponse.citedEvidenceIds.filter((id) =>
-        caseDetail.evidence.some((e) => e.id === id)
+        (caseDetail.evidence || []).some((e) => e.id === id)
       ),
       reasoningTrace: modelResponse.reasoning,
       recommendation: finalRecommendation,
@@ -355,6 +355,12 @@ export class AutonomousInvestigator {
       toolCalls: toolbox.getRecordedToolCalls(),
       metadata: {
         modelProvider: (modelResponse as any)?._modelProvider || this.provider.name,
+        model:
+          (modelResponse as any)?._model ||
+          (modelResponse as any)?.model ||
+          ((modelResponse as any)?._modelProvider || this.provider.name).replace("gemini_rest_provider_", ""),
+        usage: (modelResponse as any)?._usage || (modelResponse as any)?.usage,
+        tokens: (modelResponse as any)?._usage || (modelResponse as any)?.usage,
         exceptionsDetected: exceptions,
         autoResolutionAllowed: caseDetail.autoResolutionAllowed,
         durationMs,
@@ -368,6 +374,11 @@ export class AutonomousInvestigator {
     });
 
     const effectiveProvider = (modelResponse as any)?._modelProvider || this.provider.name;
+    const modelName =
+      (modelResponse as any)?._model ||
+      (modelResponse as any)?.model ||
+      effectiveProvider.replace("gemini_rest_provider_", "");
+    const usage = (modelResponse as any)?._usage || (modelResponse as any)?.usage;
 
     recordTraceSafe({
       runId: investigationId,
@@ -390,7 +401,13 @@ export class AutonomousInvestigator {
       policyEvaluations,
       evidenceIds: result.evidenceIds,
       events: [...events],
-      metadata: result.metadata || {},
+      metadata: {
+        ...result.metadata,
+        provider: effectiveProvider,
+        model: modelName,
+        usage,
+        tokens: usage,
+      },
     });
 
     return investigationResultSchema.parse(result);

@@ -76,7 +76,9 @@ export class LocalJsonRunRecorder extends InMemoryRunRecorder {
   constructor(options?: { logDir?: string }) {
     super();
     const isNode =
-      typeof process !== "undefined" && typeof process.cwd === "function";
+      typeof window === "undefined" &&
+      typeof process !== "undefined" &&
+      typeof process.cwd === "function";
     const cwd = isNode ? process.cwd() : "";
     this.logDir =
       options?.logDir ||
@@ -136,22 +138,41 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
   constructor(config?: NeatlogsConfig) {
     super();
     loadLocalEnv();
-    this.apiKey =
-      config?.apiKey ||
-      process.env.NEATLOGS_API_KEY ||
-      process.env.NEATLOGS_KEY ||
-      "";
+    const hasExplicitKey = config?.apiKey !== undefined;
+    this.apiKey = hasExplicitKey
+      ? (config?.apiKey || "")
+      : process.env.NEATLOGS_API_KEY || process.env.NEATLOGS_KEY || "";
     this.workflowName = config?.workflowName || "closepilot-investigation";
     this.project = config?.project || "ClosePilot";
-    this.endpoint = config?.endpoint || "https://ingest.neatlogs.com/v1/trace";
+    const isBrowser = typeof window !== "undefined";
+    this.endpoint =
+      config?.endpoint || (isBrowser ? "/api/trace" : "https://ingest.neatlogs.com/v1/trace");
     this.timeoutMs = config?.timeoutMs || 5000;
   }
 
   public override async recordTrace(trace: InvestigationRunTrace): Promise<void> {
     super.recordTrace(trace);
 
-    if (!this.apiKey) {
-      // Graceful offline fallback: retained in-memory without throwing
+    // Save locally as reliable filesystem fallback if running in Node.js
+    if (typeof window === "undefined" && typeof process !== "undefined" && typeof process.cwd === "function") {
+      try {
+        const cwd = process.cwd();
+        if (cwd && fs?.writeFileSync && path?.join) {
+          const logDir = path.resolve(cwd, ".logs", "investigations");
+          if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+          }
+          const filePath = path.join(logDir, `${trace.runId}.json`);
+          fs.writeFileSync(filePath, JSON.stringify(trace, null, 2), "utf-8");
+        }
+      } catch {
+        // Non-fatal filesystem logging
+      }
+    }
+
+    const isBrowser = typeof window !== "undefined";
+    if (!this.apiKey && !isBrowser && !this.endpoint.startsWith("/")) {
+      // Graceful offline fallback: retained in-memory and local disk without throwing
       return;
     }
 
@@ -160,12 +181,16 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (this.apiKey) {
+        headers["Authorization"] = `Bearer ${this.apiKey}`;
+      }
+
       await fetch(this.endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+        headers,
         body: JSON.stringify(payload),
         signal: controller.signal,
       }).finally(() => clearTimeout(timer));
@@ -206,9 +231,21 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
     }
 
     // 3. Model Recommendation span
+    const modelName =
+      (trace.metadata?.model as string) ||
+      (trace.provider.startsWith("gemini_rest_provider_")
+        ? trace.provider.replace("gemini_rest_provider_", "")
+        : trace.provider);
+
+    const usage = (trace.metadata?.usage || trace.metadata?.tokens) as
+      | { prompt?: number; completion?: number; total?: number }
+      | undefined;
+
     children.push({
       name: `model:${trace.provider}`,
       kind: "LLM",
+      provider: trace.provider,
+      model: modelName,
       outcome: trace.outcome,
       recommendation: trace.recommendation.action,
       suggestedReason: trace.recommendation.suggestedReason,
@@ -216,6 +253,8 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
       riskLevel: trace.riskLevel,
       rawModelAction: trace.rawModelRecommendation?.action,
       evidenceIdsCited: trace.evidenceIds,
+      durationMs: trace.durationMs,
+      tokens: usage,
     });
 
     return {
@@ -224,6 +263,9 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
       traceId: trace.runId,
       caseId: trace.caseId,
       bankTransactionId: trace.bankTransactionId,
+      provider: trace.provider,
+      model: modelName,
+      tokens: usage,
       startTime: trace.startTime,
       endTime: trace.endTime,
       durationMs: trace.durationMs,
@@ -231,6 +273,8 @@ export class NeatlogsRunRecorder extends InMemoryRunRecorder {
       children,
       metadata: {
         ...trace.metadata,
+        provider: trace.provider,
+        model: modelName,
         requiresHumanReview: trace.requiresHumanReview,
         error: trace.error?.message,
       },

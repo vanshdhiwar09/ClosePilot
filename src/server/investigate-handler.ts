@@ -66,6 +66,8 @@ export async function handleInvestigateRequest(
       data: {
         ...analysis,
         _modelProvider: provider.name,
+        _model: model,
+        _usage: analysis.usage,
       },
       providerName: provider.name,
     };

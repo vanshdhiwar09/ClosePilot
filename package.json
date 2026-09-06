@@ -13,9 +13,6 @@
     "eval": "tsx src/evaluation/cli.ts"
   },
   "dependencies": {
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^4.3.0",
     "lucide-react": "^1.41.0",
     "neatlogs": "^1.1.19",
     "react": "^19.2.8",
@@ -24,8 +21,12 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^4.3.0",
     "tsx": "^4.11.0",
     "typescript": "^5.4.5",
+    "vite": "^5.4.21",
     "vitest": "^1.6.0"
   }
 }

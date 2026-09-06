@@ -103,6 +103,15 @@ Respond ONLY with raw JSON matching this schema.
 
       const parsed = JSON.parse(contentText);
 
+      const usageMetadata = json.usageMetadata;
+      const usage = usageMetadata
+        ? {
+            prompt: usageMetadata.promptTokenCount ?? 0,
+            completion: usageMetadata.candidatesTokenCount ?? 0,
+            total: usageMetadata.totalTokenCount ?? 0,
+          }
+        : undefined;
+
       return {
         summary: parsed.summary || "Case analyzed by Gemini model.",
         rootCause: parsed.rootCause || "Root cause identified by model.",
@@ -114,6 +123,8 @@ Respond ONLY with raw JSON matching this schema.
         confidence: (parsed.confidence as InvestigationConfidence) || "MEDIUM",
         riskLevel: (parsed.riskLevel as RiskLevel) || "MEDIUM",
         citedEvidenceIds: Array.isArray(parsed.citedEvidenceIds) ? parsed.citedEvidenceIds : [],
+        usage,
+        model: this.model,
       };
     } finally {
       clearTimeout(timeoutId);

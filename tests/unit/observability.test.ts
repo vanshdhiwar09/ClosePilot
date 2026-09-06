@@ -371,30 +371,42 @@ describe("Phase 6 Observability & Run Logging", () => {
 
   describe("5. Neatlogs Run Recorder Integration", () => {
     it("operates in offline mode without throwing when no API key is provided", async () => {
-      const recorder = new NeatlogsRunRecorder({ apiKey: "" });
+      let fetchCalled = false;
+      const originalFetch = global.fetch;
+      global.fetch = (async () => {
+        fetchCalled = true;
+        return new Response();
+      }) as any;
 
-      const trace: InvestigationRunTrace = {
-        runId: "RUN-NEAT-OFFLINE",
-        caseId: "EC002",
-        bankTransactionId: "BT002",
-        startTime: new Date().toISOString(),
-        endTime: new Date().toISOString(),
-        durationMs: 95,
-        provider: "mock_gemini",
-        outcome: "COMPLETED",
-        recommendation: { action: "APPROVE_MATCH", suggestedReason: "Offline test reason" },
-        confidence: "HIGH",
-        riskLevel: "LOW",
-        requiresHumanReview: true,
-        toolCalls: [],
-        policyEvaluations: [],
-        evidenceIds: [],
-        events: [],
-        metadata: {},
-      };
+      try {
+        const recorder = new NeatlogsRunRecorder({ apiKey: "" });
 
-      await expect(recorder.recordTrace(trace)).resolves.not.toThrow();
-      expect(recorder.getTraces().length).toBe(1);
+        const trace: InvestigationRunTrace = {
+          runId: "RUN-NEAT-OFFLINE",
+          caseId: "EC002",
+          bankTransactionId: "BT002",
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          durationMs: 95,
+          provider: "deterministic_accounting_model_v1",
+          outcome: "COMPLETED",
+          recommendation: { action: "APPROVE_MATCH", suggestedReason: "Offline test reason" },
+          confidence: "HIGH",
+          riskLevel: "LOW",
+          requiresHumanReview: true,
+          toolCalls: [],
+          policyEvaluations: [],
+          evidenceIds: [],
+          events: [],
+          metadata: {},
+        };
+
+        await expect(recorder.recordTrace(trace)).resolves.not.toThrow();
+        expect(recorder.getTraces().length).toBe(1);
+        expect(fetchCalled).toBe(false);
+      } finally {
+        global.fetch = originalFetch;
+      }
     });
 
     it("sends structured trace with tool, guardrail, and llm spans when key is provided", async () => {
@@ -423,7 +435,7 @@ describe("Phase 6 Observability & Run Logging", () => {
           startTime: new Date().toISOString(),
           endTime: new Date().toISOString(),
           durationMs: 150,
-          provider: "mock_gemini",
+          provider: "gemini_rest_provider_gemini-flash-lite-latest",
           outcome: "COMPLETED",
           recommendation: {
             action: "APPROVE_MATCH",
@@ -502,7 +514,7 @@ describe("Phase 6 Observability & Run Logging", () => {
           startTime: new Date().toISOString(),
           endTime: new Date().toISOString(),
           durationMs: 50,
-          provider: "mock_gemini",
+          provider: "gemini_rest_provider_gemini-flash-lite-latest",
           outcome: "COMPLETED",
           recommendation: { action: "APPROVE_MATCH", suggestedReason: "Fetch error test reason" },
           confidence: "HIGH",

@@ -1,0 +1,27 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm ci",
+  "functions": {
+    "api/investigate.ts": {
+      "maxDuration": 30
+    },
+    "api/trace.ts": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/investigate",
+      "destination": "/api/investigate"
+    },
+    {
+      "source": "/api/trace",
+      "destination": "/api/trace"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

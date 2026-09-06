@@ -41,6 +41,7 @@ import { bankTransactionSchema } from "../../schemas/bank-transaction";
 import { ledgerEntrySchema } from "../../schemas/ledger-entry";
 import { supportingDocumentSchema, normalizeSupportingDocumentInput } from "../../schemas/supporting-document";
 import { ApiInvestigationModelProvider } from "../../agent/api-provider";
+import { NeatlogsRunRecorder } from "../../observability";
 
 /**
  * Maps machine exception types into human-friendly finance operations labels.
@@ -282,11 +283,14 @@ export async function startReconciliationSession(
       };
 
   const modelProvider = new ApiInvestigationModelProvider();
+  const recorder = new NeatlogsRunRecorder();
   const workflowResult = await runEndToEndReconciliationWorkflow({
     fixtureData,
     groundTruthData,
+    recorder,
     investigatorOptions: {
       modelProvider,
+      recorder,
     },
   });
 

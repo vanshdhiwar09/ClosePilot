@@ -22,8 +22,8 @@ export class PolicyValidator {
     citedEvidenceIds: string[],
     riskLevel: RiskLevel
   ): PolicyValidationResult {
-    const exceptions = caseDetail.exceptions.map((e) => e.type);
-    const availableEvidenceIds = new Set(caseDetail.evidence.map((e) => e.id));
+    const exceptions = (caseDetail.exceptions || []).map((e) => e.type);
+    const availableEvidenceIds = new Set((caseDetail.evidence || []).map((e) => e.id));
 
     // Rule 1: Evidence Citation Integrity
     // The agent must only cite evidence items that actually exist in the case context.

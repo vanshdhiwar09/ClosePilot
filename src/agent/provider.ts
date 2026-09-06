@@ -25,6 +25,13 @@ export type ModelAnalysisResponse = {
   confidence: InvestigationConfidence;
   riskLevel: RiskLevel;
   citedEvidenceIds: string[];
+  usage?: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+  model?: string;
+  durationMs?: number;
 };
 
 export interface InvestigationModelProvider {
