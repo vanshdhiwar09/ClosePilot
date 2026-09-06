@@ -87,9 +87,9 @@ export type AgentRecommendation = {
 
 export const agentRecommendationSchema = z.object({
   action: recommendationActionSchema,
-  targetLedgerEntryId: z.string().optional(),
+  targetLedgerEntryId: z.string().nullable().optional().transform((val) => val ?? undefined),
   suggestedReason: z.string().min(1, "Suggested reason cannot be empty"),
-  requiredEvidenceTypes: z.array(z.string()).optional(),
+  requiredEvidenceTypes: z.array(z.string()).nullable().optional().transform((val) => val ?? undefined),
 });
 
 export type PolicyValidationResult = {

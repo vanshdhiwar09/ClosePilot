@@ -219,5 +219,19 @@ describe("ApiInvestigationModelProvider & Server Handler Boundary", () => {
       expect(jsonStr).not.toContain(fakeSecretKey);
       expect(jsonStr).toContain("[REDACTED");
     });
+
+    it("F3: safely handles null targetLedgerEntryId and requiredEvidenceTypes in model responses without schema crash", async () => {
+      const { agentRecommendationSchema } = await import("../../src/agent/types");
+      const parsed = agentRecommendationSchema.parse({
+        action: "ESCALATE_TO_MANAGEMENT",
+        targetLedgerEntryId: null,
+        suggestedReason: "No matching candidate entry found.",
+        requiredEvidenceTypes: null,
+      });
+
+      expect(parsed.targetLedgerEntryId).toBeUndefined();
+      expect(parsed.requiredEvidenceTypes).toBeUndefined();
+      expect(parsed.action).toBe("ESCALATE_TO_MANAGEMENT");
+    });
   });
 });

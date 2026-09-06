@@ -272,9 +272,9 @@ export class AutonomousInvestigator {
     const policy = PolicyValidator.validate(
       {
         action: modelResponse.recommendedAction,
-        targetLedgerEntryId: modelResponse.targetLedgerEntryId,
+        targetLedgerEntryId: modelResponse.targetLedgerEntryId || undefined,
         suggestedReason: modelResponse.suggestedReason,
-        requiredEvidenceTypes: modelResponse.requiredEvidenceTypes,
+        requiredEvidenceTypes: modelResponse.requiredEvidenceTypes || undefined,
       },
       caseDetail,
       modelResponse.citedEvidenceIds,
@@ -307,9 +307,9 @@ export class AutonomousInvestigator {
     // If policy rejected the recommendation, sanitize recommendation to force human review safely
     const rawModelRecommendation = {
       action: modelResponse.recommendedAction,
-      targetLedgerEntryId: modelResponse.targetLedgerEntryId,
+      targetLedgerEntryId: modelResponse.targetLedgerEntryId || undefined,
       suggestedReason: modelResponse.suggestedReason,
-      requiredEvidenceTypes: modelResponse.requiredEvidenceTypes,
+      requiredEvidenceTypes: modelResponse.requiredEvidenceTypes || undefined,
     };
 
     let finalRecommendation = { ...rawModelRecommendation };
@@ -317,9 +317,9 @@ export class AutonomousInvestigator {
     if (!policy.isPermitted) {
       finalRecommendation = {
         action: "ESCALATE_TO_MANAGEMENT",
-        targetLedgerEntryId: modelResponse.targetLedgerEntryId,
+        targetLedgerEntryId: modelResponse.targetLedgerEntryId || undefined,
         suggestedReason: `Policy violation: ${policy.policyReason} Forced escalation to human reviewer.`,
-        requiredEvidenceTypes: modelResponse.requiredEvidenceTypes,
+        requiredEvidenceTypes: modelResponse.requiredEvidenceTypes || undefined,
       };
     }
 
