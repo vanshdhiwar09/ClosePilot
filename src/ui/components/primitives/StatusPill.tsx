@@ -6,6 +6,9 @@ export type StatusPillVariant =
   | "human_review"
   | "investigating"
   | "exception"
+  | "resolved"
+  | "rejected"
+  | "waiting_evidence"
   | "neutral";
 
 interface StatusPillProps {
@@ -29,11 +32,12 @@ export const StatusPill: React.FC<StatusPillProps> = ({
 
   switch (variant) {
     case "auto_resolved":
+    case "resolved":
       bg = "var(--cp-status-success-bg)";
       border = "var(--cp-status-success-border)";
       text = "var(--cp-status-success-text)";
       dot = "var(--cp-status-success-dot)";
-      defaultLabel = "Auto-Resolved";
+      defaultLabel = variant === "resolved" ? "Resolved" : "Auto-Resolved";
       break;
     case "human_review":
       bg = "var(--cp-status-warning-bg)";
@@ -41,6 +45,13 @@ export const StatusPill: React.FC<StatusPillProps> = ({
       text = "var(--cp-status-warning-text)";
       dot = "var(--cp-status-warning-dot)";
       defaultLabel = "Human Review";
+      break;
+    case "waiting_evidence":
+      bg = "var(--cp-badge-indigo-bg)";
+      border = "var(--cp-badge-indigo-border)";
+      text = "var(--cp-badge-indigo-text)";
+      dot = "var(--cp-badge-indigo-text)";
+      defaultLabel = "Waiting for Evidence";
       break;
     case "investigating":
       bg = "var(--cp-status-info-bg)";
@@ -50,11 +61,12 @@ export const StatusPill: React.FC<StatusPillProps> = ({
       defaultLabel = "Investigating";
       break;
     case "exception":
+    case "rejected":
       bg = "var(--cp-status-danger-bg)";
       border = "var(--cp-status-danger-border)";
       text = "var(--cp-status-danger-text)";
       dot = "var(--cp-status-danger-dot)";
-      defaultLabel = "Exception";
+      defaultLabel = variant === "rejected" ? "Rejected" : "Exception";
       break;
   }
 

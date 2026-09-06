@@ -2,33 +2,43 @@
 import React, { useEffect, useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { NavTabId } from "./components/layout/AppSidebar";
-import { OverviewDataViewModel } from "./adapter/types";
-import { loadOverviewData } from "./adapter/data-adapter";
+import { HumanReviewAction } from "./adapter/types";
+import {
+  getWorkflowState,
+  buildOverviewViewModel,
+  getExceptionCases,
+  getCaseInvestigationDetail,
+  executeReviewAction,
+  SharedWorkflowState,
+} from "./adapter/data-adapter";
 import { OverviewView } from "./views/OverviewView";
 import { ReconciliationView } from "./views/ReconciliationView";
 import { ExceptionsView } from "./views/ExceptionsView";
+import { InvestigationDetailView } from "./views/InvestigationDetailView";
 import { InvestigationsView } from "./views/InvestigationsView";
 import { EvidenceView } from "./views/EvidenceView";
 import { ClosePackageView } from "./views/ClosePackageView";
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTabId>("overview");
-  const [data, setData] = useState<OverviewDataViewModel | null>(null);
+  const [sharedState, setSharedState] = useState<SharedWorkflowState | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    loadOverviewData()
-      .then((res) => {
+    getWorkflowState()
+      .then((state) => {
         if (mounted) {
-          setData(res);
+          setSharedState(state);
           setLoading(false);
         }
       })
       .catch((err) => {
         if (mounted) {
-          setError(err.message || "Failed to load reconciliation overview data.");
+          setError(err.message || "Failed to initialize ClosePilot reconciliation workspace.");
           setLoading(false);
         }
       });
@@ -37,6 +47,24 @@ export const App: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  const handleApplyAction = async (
+    caseId: string,
+    action: HumanReviewAction,
+    reason: string
+  ) => {
+    if (!sharedState) return;
+
+    // Call pure domain state machine and regenerate close package
+    executeReviewAction(sharedState, {
+      caseId,
+      action,
+      reason,
+    });
+
+    // Bump version to trigger reactive re-render of view models
+    setVersion((v) => v + 1);
+  };
 
   if (loading) {
     return (
@@ -61,17 +89,9 @@ export const App: React.FC = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            animation: "spin 1.5s linear infinite",
           }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-          >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
             <polyline points="2 17 12 22 22 17"></polyline>
             <polyline points="2 12 12 17 22 12"></polyline>
@@ -84,7 +104,7 @@ export const App: React.FC = () => {
     );
   }
 
-  if (error || !data) {
+  if (error || !sharedState) {
     return (
       <div
         style={{
@@ -119,25 +139,61 @@ export const App: React.FC = () => {
     );
   }
 
+  const overviewData = buildOverviewViewModel(sharedState);
+  const exceptionCases = getExceptionCases(sharedState);
+  const openExceptionsCount = exceptionCases.filter((c) => c.reviewStatus === "REVIEW_REQUIRED").length;
+
   return (
     <AppShell
       currentTab={currentTab}
-      onSelectTab={setCurrentTab}
-      periodName={data.period.periodName}
-      activeStep={data.period.activeStep}
-      exceptionCount={data.kpis.humanReviewCount}
-      investigationCount={data.kpis.humanReviewCount}
-      evidenceCount={data.financials.supportingDocumentsCount}
+      onSelectTab={(tab) => {
+        setSelectedCaseId(null);
+        setCurrentTab(tab);
+      }}
+      periodName={overviewData.period.periodName}
+      activeStep={selectedCaseId ? "resolve" : overviewData.period.activeStep}
+      exceptionCount={openExceptionsCount}
+      investigationCount={exceptionCases.length}
+      evidenceCount={overviewData.financials.supportingDocumentsCount}
     >
-      {currentTab === "overview" && <OverviewView data={data} onNavigate={setCurrentTab} />}
-      {currentTab === "reconciliation" && <ReconciliationView onNavigate={setCurrentTab} />}
-      {currentTab === "exceptions" && <ExceptionsView data={data} onNavigate={setCurrentTab} />}
-      {currentTab === "investigations" && <InvestigationsView data={data} onNavigate={setCurrentTab} />}
-      {currentTab === "evidence" && <EvidenceView onNavigate={setCurrentTab} />}
-      {currentTab === "close-package" && <ClosePackageView data={data} onNavigate={setCurrentTab} />}
+      {selectedCaseId ? (
+        <InvestigationDetailView
+          caseDetail={getCaseInvestigationDetail(sharedState, selectedCaseId)}
+          onBack={() => setSelectedCaseId(null)}
+          onApplyAction={handleApplyAction}
+        />
+      ) : (
+        <>
+          {currentTab === "overview" && (
+            <OverviewView
+              data={overviewData}
+              onNavigate={setCurrentTab}
+              onSelectCase={(id) => {
+                setSelectedCaseId(id);
+              }}
+            />
+          )}
+          {currentTab === "reconciliation" && <ReconciliationView onNavigate={setCurrentTab} />}
+          {currentTab === "exceptions" && (
+            <ExceptionsView
+              cases={exceptionCases}
+              onSelectCase={(id) => setSelectedCaseId(id)}
+              onNavigate={setCurrentTab}
+            />
+          )}
+          {currentTab === "investigations" && (
+            <InvestigationsView
+              cases={exceptionCases}
+              onSelectCase={(id) => setSelectedCaseId(id)}
+              onNavigate={setCurrentTab}
+            />
+          )}
+          {currentTab === "evidence" && <EvidenceView onNavigate={setCurrentTab} />}
+          {currentTab === "close-package" && <ClosePackageView data={overviewData} onNavigate={setCurrentTab} />}
+        </>
+      )}
     </AppShell>
   );
 };
 
 export default App;
-

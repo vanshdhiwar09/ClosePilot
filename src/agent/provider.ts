@@ -157,9 +157,17 @@ export class DeterministicMockProvider implements InvestigationModelProvider {
     // BT007: Potential anomaly
     if (exceptions.includes("potential_anomaly")) {
       const candidateId = caseDetail.candidateLedgerEntries[0]?.id;
+      const calcEvidence = caseDetail.evidence.find(
+        (e) => (e.payload as any)?.calculationType === "anomaly_threshold"
+      );
+      const calcReason = (calcEvidence?.payload as any)?.reason;
+      const rootCause = calcReason
+        ? `Amount $15,000.00 is a statistical outlier: ${calcReason}`
+        : "Amount $15,000.00 is a statistical outlier exceeding the account anomaly threshold ($6,250.00, computed as 5x median $1,250.00).";
+
       return {
         summary: `Transaction ${caseDetail.bankTransaction.id} for $${caseDetail.bankTransaction.amount} exceeds account statistical threshold.`,
-        rootCause: "Amount $15,000.00 is a statistical outlier exceeding 3x account median baseline ($1,000.00).",
+        rootCause,
         reasoning: [
           "Reference and dates align with entry LE009, but deterministic anomaly detector triggered.",
           "High-value transaction requires controller authorization.",

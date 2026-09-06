@@ -11,9 +11,10 @@ import { NavTabId } from "../components/layout/AppSidebar";
 interface OverviewViewProps {
   data: OverviewDataViewModel;
   onNavigate: (tab: NavTabId) => void;
+  onSelectCase?: (caseId: string) => void;
 }
 
-export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate }) => {
+export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, onSelectCase }) => {
   const { kpis, financials, exceptionsDistribution, transactions } = data;
 
   return (
@@ -355,6 +356,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate }) 
                       idx < transactions.length - 1 ? "1px solid var(--cp-border-subtle)" : "none",
                     backgroundColor: idx % 2 === 0 ? "var(--cp-bg-surface)" : "var(--cp-bg-canvas)",
                     transition: "background-color 0.1s ease",
+                    cursor: tx.status === "human_review" ? "pointer" : "default",
+                  }}
+                  onClick={() => {
+                    if (tx.status === "human_review" && onSelectCase) {
+                      onSelectCase(tx.caseId);
+                    }
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "var(--cp-bg-surface-hover)";

@@ -63,3 +63,129 @@ export type OverviewDataViewModel = {
   exceptionsDistribution: ExceptionDistributionItem[];
   transactions: OverviewTransactionItem[];
 };
+
+// ==========================================
+// Phase 7B: Exceptions & Investigation Types
+// ==========================================
+
+export type HumanReviewState =
+  | "REVIEW_REQUIRED"
+  | "WAITING_FOR_EVIDENCE"
+  | "RESOLVED"
+  | "REJECTED"
+  | "AUTO_RESOLVED";
+
+export type HumanReviewAction =
+  | "APPROVE"
+  | "REJECT"
+  | "REQUEST_EVIDENCE"
+  | "SUPPLY_EVIDENCE";
+
+export type ExceptionCaseSummary = {
+  caseId: string;
+  bankTxId: string;
+  date: string;
+  counterparty: string;
+  description: string;
+  reference: string;
+  amount: string;
+  rawAmount: number;
+  currency: string;
+  exceptionType?: string;
+  exceptionLabel: string;
+  severity: "low" | "medium" | "high" | "critical";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  reviewStatus: HumanReviewState;
+  reviewStatusLabel: string;
+  investigationOutcome: string;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  recommendationAction: string;
+  recommendationReason: string;
+  evidenceCount: number;
+  toolCallsCount: number;
+  isFlagship: boolean;
+};
+
+export type ToolTraceItemViewModel = {
+  toolName: string;
+  status: "completed" | "failed" | "skipped";
+  durationMs: number;
+  timestamp: string;
+  sanitizedInput: Record<string, unknown>;
+  outputSummary?: string;
+};
+
+export type EvidenceDetailViewModel = {
+  id: string;
+  kind: string;
+  sourceId: string;
+  locator: string;
+  description?: string;
+  summary: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type PolicyGuardrailViewModel = {
+  policyRule: string;
+  isPermitted: boolean;
+  policyReason: string;
+  forcedHumanReview: boolean;
+  timestamp: string;
+};
+
+export type DecisionHistoryViewModel = {
+  id: string;
+  action: HumanReviewAction;
+  reviewerId: string;
+  reviewerName: string;
+  reviewerRole: string;
+  reason: string;
+  timestamp: string;
+  fromState: string;
+  toState: string;
+};
+
+export type CaseInvestigationDetail = {
+  summary: ExceptionCaseSummary;
+  flaggedReason: {
+    code: string;
+    description: string;
+    technicalDetails?: string;
+    ruleTriggered?: string;
+  };
+  investigation: {
+    investigationId: string;
+    runId: string;
+    outcome: string;
+    summary: string;
+    rootCause: string;
+    recommendation: {
+      action: string;
+      suggestedReason: string;
+      targetLedgerEntryId?: string;
+      requiredEvidenceTypes?: string[];
+    };
+    confidence: "HIGH" | "MEDIUM" | "LOW";
+    riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+    requiresHumanReview: boolean;
+    investigatedAt: string;
+  };
+  policyEvaluations: PolicyGuardrailViewModel[];
+  toolCalls: ToolTraceItemViewModel[];
+  traceEvents: Array<{
+    eventType: string;
+    timestamp: string;
+    label: string;
+  }>;
+  evidence: EvidenceDetailViewModel[];
+  candidateEntries: Array<{
+    id: string;
+    date: string;
+    amount: string;
+    reference?: string;
+    account: string;
+  }>;
+  decisionHistory: DecisionHistoryViewModel[];
+  allowedActions: HumanReviewAction[];
+};
