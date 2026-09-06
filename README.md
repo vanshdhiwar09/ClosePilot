@@ -19,7 +19,7 @@
 | | |
 |---|---|
 | 🌐 **Live Demo** | [close-pilot-zeta.vercel.app](https://close-pilot-zeta.vercel.app/) |
-| 🎬 **Demo Video** | [▶ Watch the ClosePilot Demo — Coming Soon](DEMO_VIDEO_URL_HERE) |
+| 🎬 **Demo Video** | [▶ Watch the ClosePilot Demo Video](https://x.com/VanshDhiwar9/status/2096679317346644363?s=20) |
 | 🏆 **Track** | Autonomous Office of the CFO |
 | 📁 **Repository** | [github.com/vanshdhiwar09/ClosePilot](https://github.com/vanshdhiwar09/ClosePilot) |
 
@@ -558,13 +558,13 @@ To walk through the investigation workflow:
 
 ## Demo Video
 
-**[▶ Watch the ClosePilot Demo — Coming Soon](DEMO_VIDEO_URL_HERE)**
+**[▶ Watch the ClosePilot Demo Video on X](https://x.com/VanshDhiwar9/status/2096679317346644363?s=20)**
 
 ---
 
 ## Project Updates
 
-**X / Twitter:** [X_POST_URL_HERE](X_POST_URL_HERE)
+**X / Twitter:** [x.com/VanshDhiwar9/status/2096679317346644363](https://x.com/VanshDhiwar9/status/2096679317346644363?s=20)
 
 ---
 
