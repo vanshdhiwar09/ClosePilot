@@ -75,10 +75,14 @@ export class LocalJsonRunRecorder extends InMemoryRunRecorder {
 
   constructor(options?: { logDir?: string }) {
     super();
+    const isNode =
+      typeof process !== "undefined" && typeof process.cwd === "function";
+    const cwd = isNode ? process.cwd() : "";
     this.logDir =
-      options?.logDir || path.resolve(process.cwd(), ".logs", "investigations");
+      options?.logDir ||
+      (isNode && cwd ? path.resolve(cwd, ".logs", "investigations") : "");
     try {
-      if (!fs.existsSync(this.logDir)) {
+      if (isNode && this.logDir && !fs.existsSync(this.logDir)) {
         fs.mkdirSync(this.logDir, { recursive: true });
       }
     } catch {
@@ -89,6 +93,7 @@ export class LocalJsonRunRecorder extends InMemoryRunRecorder {
   public override recordTrace(trace: InvestigationRunTrace): void {
     super.recordTrace(trace);
     try {
+      if (!this.logDir || !fs?.writeFileSync || !path?.join) return;
       const sanitized = this.sanitizeTrace(trace);
       const filePath = path.join(this.logDir, `${trace.runId}.json`);
       fs.writeFileSync(filePath, JSON.stringify(sanitized, null, 2), "utf-8");

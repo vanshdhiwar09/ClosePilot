@@ -1,0 +1,78 @@
+/* src/ui/styles/index.css */
+@import "./tokens.css";
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  background-color: var(--cp-bg-canvas);
+  color: var(--cp-text-primary);
+  font-family: var(--cp-font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle paper grid background matching the design reference */
+body {
+  background-image:
+    linear-gradient(to right, rgba(20, 21, 25, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 21, 25, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography Helpers */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--cp-text-primary);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Financial Figures and Monospace Amounts */
+.cp-mono {
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cp-border-default);
+  border-radius: var(--cp-radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cp-border-strong);
+}

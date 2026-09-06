@@ -1,0 +1,79 @@
+/* src/ui/styles/tokens.css */
+/* ClosePilot Design System Tokens: Warm paper canvas, crisp typography, restrained functional accents */
+
+:root {
+  /* Canvas & Paper Backgrounds */
+  --cp-bg-canvas: #FAF9F5;
+  --cp-bg-canvas-subtle: #F4F3EE;
+  --cp-bg-surface: #FFFFFF;
+  --cp-bg-surface-hover: #F8F8F6;
+  --cp-bg-surface-active: #F2F1EC;
+  --cp-bg-muted: #F3F2EC;
+
+  /* Text & Hierarchy */
+  --cp-text-primary: #121316;
+  --cp-text-secondary: #565965;
+  --cp-text-tertiary: #848794;
+  --cp-text-inverted: #FFFFFF;
+
+  /* Borders & Dividers */
+  --cp-border-subtle: #ECEAE3;
+  --cp-border-default: #DDD9CF;
+  --cp-border-strong: #C4C0B5;
+
+  /* Status: Restrained Emerald Green (Matched, Safe, Resolved, Approved) */
+  --cp-status-success-bg: #ECFDF5;
+  --cp-status-success-border: #A7F3D0;
+  --cp-status-success-text: #065F46;
+  --cp-status-success-dot: #10B981;
+
+  /* Status: Restrained Amber (Timing Diff, In Review, Pending Approval) */
+  --cp-status-warning-bg: #FFFBEB;
+  --cp-status-warning-border: #FDE68A;
+  --cp-status-warning-text: #92400E;
+  --cp-status-warning-dot: #F59E0B;
+
+  /* Status: Restrained Rose / Red (Exceptions, Unmatched, Missing Doc, Risk) */
+  --cp-status-danger-bg: #FFF1F2;
+  --cp-status-danger-border: #FECDD3;
+  --cp-status-danger-text: #9F1239;
+  --cp-status-danger-dot: #E11D48;
+
+  /* Status: Restrained Indigo (Investigating, Agent Autonomous Activity) */
+  --cp-status-info-bg: #EEF2FF;
+  --cp-status-info-border: #C7D2FE;
+  --cp-status-info-text: #3730A3;
+  --cp-status-info-dot: #6366F1;
+
+  /* Neutral Badges */
+  --cp-status-neutral-bg: #F3F2ED;
+  --cp-status-neutral-border: #E0DDD4;
+  --cp-status-neutral-text: #454752;
+
+  /* Shadows (Subtle, paper-like elevation) */
+  --cp-shadow-xs: 0 1px 2px rgba(18, 19, 22, 0.03);
+  --cp-shadow-sm: 0 1px 3px rgba(18, 19, 22, 0.05), 0 1px 2px rgba(18, 19, 22, 0.03);
+  --cp-shadow-md: 0 4px 8px -1px rgba(18, 19, 22, 0.06), 0 2px 4px -2px rgba(18, 19, 22, 0.04);
+  --cp-shadow-float: 0 12px 24px -4px rgba(18, 19, 22, 0.08), 0 4px 6px -2px rgba(18, 19, 22, 0.03);
+
+  /* Typography Stack: Local / System Fonts Only (Zero Google Font dependency) */
+  --cp-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cp-font-mono: "SF Mono", "Segoe UI Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  /* Radius */
+  --cp-radius-xs: 4px;
+  --cp-radius-sm: 6px;
+  --cp-radius-md: 8px;
+  --cp-radius-lg: 12px;
+  --cp-radius-pill: 9999px;
+
+  /* Spacing */
+  --cp-space-1: 4px;
+  --cp-space-2: 8px;
+  --cp-space-3: 12px;
+  --cp-space-4: 16px;
+  --cp-space-5: 20px;
+  --cp-space-6: 24px;
+  --cp-space-8: 32px;
+  --cp-space-10: 40px;
+}

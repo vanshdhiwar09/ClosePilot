@@ -19,6 +19,8 @@ import { diagnoseCaseFailure } from "./failure";
 export type EvaluationOptions = {
   fixtureName?: string;
   groundTruthVersion?: string;
+  fixtureData?: Record<string, unknown>;
+  groundTruthData?: Record<string, unknown>;
   workflowVersion?: string;
   matcherConfig?: MatcherConfig;
 };
@@ -31,8 +33,8 @@ export function runEvaluation(options?: EvaluationOptions): EvaluationRunReport 
   const groundTruthVersion = options?.groundTruthVersion || "2024.1";
   const workflowVersion = options?.workflowVersion || "2024.1";
 
-  const fixture = loadFixture(fixtureName) as any;
-  const groundTruth = loadGroundTruth(groundTruthVersion) as any;
+  const fixture = (options?.fixtureData || loadFixture(fixtureName)) as any;
+  const groundTruth = (options?.groundTruthData || loadGroundTruth(groundTruthVersion)) as any;
 
   const bankTransactions: BankTransaction[] = fixture.bankTransactions;
   const ledgerEntries: LedgerEntry[] = fixture.ledgerEntries;

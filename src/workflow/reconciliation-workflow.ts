@@ -35,6 +35,8 @@ import {
 export type EndToEndWorkflowOptions = {
   fixtureName?: string;
   groundTruthVersion?: string;
+  fixtureData?: Record<string, unknown>;
+  groundTruthData?: Record<string, unknown>;
   investigator?: AutonomousInvestigator;
   investigatorOptions?: InvestigatorOptions;
   recorder?: InvestigationRunRecorder;
@@ -76,8 +78,8 @@ export async function runEndToEndReconciliationWorkflow(
   const groundTruthVersion = options?.groundTruthVersion || "2024.1";
   const investigateAutoResolved = options?.investigateAutoResolved ?? false;
 
-  const fixture = loadFixture(fixtureName) as any;
-  const groundTruth = loadGroundTruth(groundTruthVersion) as any;
+  const fixture = (options?.fixtureData || loadFixture(fixtureName)) as any;
+  const groundTruth = (options?.groundTruthData || loadGroundTruth(groundTruthVersion)) as any;
 
   const bankTransactions: BankTransaction[] = fixture.bankTransactions;
   const ledgerEntries: LedgerEntry[] = fixture.ledgerEntries;

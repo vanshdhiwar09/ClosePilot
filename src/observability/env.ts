@@ -16,7 +16,17 @@ export function loadLocalEnv(rootDir?: string): Record<string, string> {
     return {};
   }
 
-  const baseDir = rootDir || process.cwd();
+  const baseDir =
+    rootDir ||
+    (typeof process !== "undefined" && typeof process.cwd === "function"
+      ? process.cwd()
+      : "");
+
+  if (!fs?.existsSync || !path?.resolve || !baseDir) {
+    envLoaded = true;
+    return {};
+  }
+
   const envPath = path.resolve(baseDir, ".env");
 
   if (!fs.existsSync(envPath)) {

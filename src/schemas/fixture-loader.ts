@@ -21,9 +21,13 @@ import * as path from "node:path";
 
 // Resolve data directories relative to project root (CWD)
 // The hackathon runs from the project root, so process.cwd() gives the project root
-const PROJECT_ROOT = process.cwd();
-const FIXTURES_DIR = path.resolve(PROJECT_ROOT, "data/fixtures");
-const GROUND_TRUTH_DIR = path.resolve(PROJECT_ROOT, "data/ground-truth");
+const isNode =
+  typeof process !== "undefined" && typeof process.cwd === "function";
+const PROJECT_ROOT = isNode ? process.cwd() : "";
+const FIXTURES_DIR =
+  isNode && PROJECT_ROOT ? path.resolve(PROJECT_ROOT, "data/fixtures") : "";
+const GROUND_TRUTH_DIR =
+  isNode && PROJECT_ROOT ? path.resolve(PROJECT_ROOT, "data/ground-truth") : "";
 
 // Export types
 export type { FixtureMetadata } from "./input-ref";
@@ -38,6 +42,9 @@ type FixtureRecords = {
 
 // Load a fixture by name (without .json extension)
 export const loadFixture = (fixtureName: string): Record<string, unknown> => {
+  if (!fs?.existsSync || !path?.join) {
+    throw new Error(`loadFixture requires Node.js filesystem environment. In browser, provide pre-loaded fixtureData.`);
+  }
   const fixturePath = path.join(FIXTURES_DIR, `${fixtureName}.json`);
   if (!fs.existsSync(fixturePath)) {
     throw new Error(`Fixture not found: ${fixturePath}`);
@@ -48,6 +55,9 @@ export const loadFixture = (fixtureName: string): Record<string, unknown> => {
 
 // Load ground truth by fixture version
 export const loadGroundTruth = (fixtureVersion: string): Record<string, unknown> => {
+  if (!fs?.existsSync || !path?.join) {
+    throw new Error(`loadGroundTruth requires Node.js filesystem environment. In browser, provide pre-loaded groundTruthData.`);
+  }
   const gtPath = path.join(GROUND_TRUTH_DIR, `${fixtureVersion}.json`);
   if (!fs.existsSync(gtPath)) {
     throw new Error(`Ground truth not found: ${gtPath}`);
