@@ -48,30 +48,27 @@ export class ApiInvestigationModelProvider implements InvestigationModelProvider
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        console.warn(
-          `[ApiInvestigationModelProvider] Server responded with HTTP ${response.status}: ${errJson.error || "Unknown error"}. Falling back to deterministic provider.`
-        );
+        const reason = `HTTP ${response.status}: ${errJson.error || errJson.reason || "Server error"}`;
+        console.warn(`[ApiInvestigationModelProvider] ${reason}. Falling back to deterministic provider.`);
         const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
-        return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
+        return { ...fallbackRes, _modelProvider: `fallback (${reason})` };
       }
 
       const data = await response.json();
 
       if (data.fallback || data.error) {
-        console.warn(
-          `[ApiInvestigationModelProvider] Server indicated fallback: ${data.reason || data.error || "No API key"}. Using deterministic provider.`
-        );
+        const reason = data.reason || data.error || "No API key configured";
+        console.warn(`[ApiInvestigationModelProvider] Server indicated fallback: ${reason}. Using deterministic provider.`);
         const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
-        return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
+        return { ...fallbackRes, _modelProvider: `fallback (${reason})` };
       }
 
       return data as ModelAnalysisResponse;
     } catch (err: any) {
-      console.warn(
-        `[ApiInvestigationModelProvider] Network or timeout error reaching /api/investigate: ${err.message}. Falling back to deterministic provider.`
-      );
+      const reason = `Network error: ${err.message}`;
+      console.warn(`[ApiInvestigationModelProvider] ${reason}. Falling back to deterministic provider.`);
       const fallbackRes = await this.fallbackProvider.analyzeCase(prompt);
-      return { ...fallbackRes, _modelProvider: "deterministic_accounting_model_v1" };
+      return { ...fallbackRes, _modelProvider: `fallback (${reason})` };
     } finally {
       clearTimeout(timeoutId);
     }
