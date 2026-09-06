@@ -38,8 +38,8 @@ export async function handleInvestigateRequest(
   }
 
   // 2. Check for Gemini / Google API key in server environment
-  const apiKey = env.GEMINI_API_KEY || env.GOOGLE_API_KEY || "";
-  const model = env.GEMINI_MODEL || "gemini-flash-lite-latest";
+  const apiKey = (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || "").trim();
+  const model = (env.GEMINI_MODEL || "gemini-flash-lite-latest").trim();
 
   if (!apiKey) {
     return {
