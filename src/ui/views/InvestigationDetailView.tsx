@@ -647,6 +647,7 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
                     type="button"
                     variant={selectedAction === action ? "primary" : "outline"}
                     size="md"
+                    pill
                     onClick={() => setSelectedAction(action)}
                   >
                     {action.replace(/_/g, " ")}
@@ -657,12 +658,12 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
 
             <div>
               <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--cp-text-secondary)", display: "block", marginBottom: "6px" }}>
-                Decision Reason (Required for Accounting Audit Trail)
+                Mandatory Reviewer Rationale
               </label>
               <textarea
                 value={decisionReason}
                 onChange={(e) => setDecisionReason(e.target.value)}
-                placeholder="Provide rationale for approving, rejecting, or requesting evidence on this transaction..."
+                placeholder="Enter auditable business rationale justifying this resolution..."
                 rows={3}
                 style={{
                   width: "100%",
@@ -687,6 +688,7 @@ export const InvestigationDetailView: React.FC<InvestigationDetailViewProps> = (
                 type="submit"
                 variant="primary"
                 size="md"
+                pill
                 disabled={isSubmitting || !selectedAction}
               >
                 {isSubmitting ? "Executing Decision..." : `Execute ${selectedAction || "Action"}`}

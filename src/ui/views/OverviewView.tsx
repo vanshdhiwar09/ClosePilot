@@ -52,18 +52,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
               marginTop: "4px",
             }}
           >
-            Autonomous investigation agent active for period {data.period.periodName}. 1 case
-            auto-resolved; 7 exceptions investigated and prepared for human review.
+            Autonomous investigation agent active for period {data.period.periodName}. {kpis.autoResolvedCount} case{kpis.autoResolvedCount === 1 ? "" : "s"} auto-resolved; {kpis.humanReviewCount} exception{kpis.humanReviewCount === 1 ? "" : "s"} investigated and prepared for human review.
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Button variant="outline" size="md" onClick={() => onNavigate("close-package")}>
+          <Button variant="outline" size="md" pill onClick={() => onNavigate("close-package")}>
             View Close Package
           </Button>
           <Button
             variant="primary"
             size="md"
+            pill
             onClick={() => onNavigate("exceptions")}
             icon={
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -73,7 +73,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
             }
             iconPosition="right"
           >
-            Review Exceptions (7)
+            Review Exceptions ({kpis.humanReviewCount})
           </Button>
         </div>
       </div>
@@ -90,8 +90,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
           label="Agreement Accuracy"
           value={kpis.agreementAccuracy}
           detail={kpis.agreementDetail}
-          badgeText={`${kpis.agreementAccuracy} Fidelity`}
-          badgeVariant={kpis.agreementAccuracy === "100.0%" ? "emerald" : "amber"}
+          badgeText={kpis.agreementAccuracy === "N/A" ? "No Ground Truth" : `${kpis.agreementAccuracy} Fidelity`}
+          badgeVariant={kpis.agreementAccuracy === "N/A" ? "neutral" : kpis.agreementAccuracy === "100.0%" ? "emerald" : "amber"}
           icon={
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -103,9 +103,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
         <MetricCard
           label="False Auto-Close"
           value={kpis.falseAutoCloseRate}
-          detail="Zero incorrect closures (safety guard)"
-          badgeText="Safe"
-          badgeVariant="emerald"
+          detail={kpis.falseAutoCloseDetail}
+          badgeText={kpis.falseAutoCloseRate === "N/A" ? "Unverified" : "Safe"}
+          badgeVariant={kpis.falseAutoCloseRate === "N/A" ? "neutral" : "emerald"}
           icon={
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -117,7 +117,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
           label="Auto-Resolved (Exact)"
           value={kpis.autoResolvedCount}
           detail={`${kpis.autoResolvedAmount} baseline reconciled`}
-          badgeText="1 Case"
+          badgeText={`${kpis.autoResolvedCount} Case${kpis.autoResolvedCount === 1 ? "" : "s"}`}
           badgeVariant="neutral"
           icon={
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -129,9 +129,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
         <MetricCard
           label="Human Review Load"
           value={kpis.humanReviewRatio}
-          detail="7 cases require human approval"
-          badgeText="Policy Required"
-          badgeVariant="amber"
+          detail={`${kpis.humanReviewCount} case${kpis.humanReviewCount === 1 ? "" : "s"} require human approval`}
+          badgeText={kpis.humanReviewCount > 0 ? "Policy Required" : "Zero Exceptions"}
+          badgeVariant={kpis.humanReviewCount > 0 ? "amber" : "emerald"}
           icon={
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -195,7 +195,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
                   {financials.totalReconciledAmount}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--cp-status-success-text)", marginTop: "2px" }}>
-                  1 Auto-Resolved Exact Match
+                  {kpis.autoResolvedCount} Auto-Resolved Exact Match{kpis.autoResolvedCount === 1 ? "" : "es"}
                 </div>
               </div>
 
@@ -230,7 +230,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
                   {financials.totalUnreconciledAmount}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--cp-status-warning-text)", marginTop: "2px" }}>
-                  7 Cases Under Human Review
+                  {kpis.humanReviewCount} Case{kpis.humanReviewCount === 1 ? "" : "s"} Under Human Review
                 </div>
               </div>
             </div>
@@ -312,8 +312,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, onNavigate, on
 
       {/* 4. Complete Case Inventory Table (Real Fixture Transactions) */}
       <Card
-        title="Month-End Reconciliation Cases (8)"
-        subtitle="Full deterministic record set from 2024.1 fixture"
+        title={`Month-End Reconciliation Cases (${transactions.length})`}
+        subtitle={`Deterministic record set for ${data.period.periodName}`}
         noPadding
       >
         <div style={{ overflowX: "auto" }}>

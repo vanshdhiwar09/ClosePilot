@@ -19,13 +19,52 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Subtle paper grid background matching the design reference */
 body {
+  background-color: #fdfdfc;
+  position: relative;
+  overflow-x: hidden;
+  color: #111111;
+}
+
+/* Faint, precise grid */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: 48px 48px;
   background-image:
-    linear-gradient(to right, rgba(20, 21, 25, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(20, 21, 25, 0.035) 1px, transparent 1px);
-  background-size: 32px 32px;
-  background-attachment: fixed;
+    linear-gradient(to right, rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 30%, black 20%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 30%, black 20%, transparent 80%);
+}
+
+/* Central soft glow */
+.glow-bg {
+  position: fixed;
+  top: 0%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.8) 0%, rgba(253,253,252,0) 60%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Custom shadow for floating cards */
+.float-shadow {
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.15), 0 12px 24px -6px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.03);
+}
+
+/* Smooth hover shadow for premium cards */
+.premium-card-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.12), 0 16px 32px -8px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0,0,0,0.03);
 }
 
 #root {

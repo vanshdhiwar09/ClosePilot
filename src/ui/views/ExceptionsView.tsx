@@ -90,11 +90,11 @@ export const ExceptionsView: React.FC<ExceptionsViewProps> = ({
             </Badge>
           </div>
           <p style={{ fontSize: "13px", color: "var(--cp-text-secondary)", marginTop: "4px" }}>
-            7 total exceptions investigated by the autonomous agent. Review agent findings, inspect evidence, and authorize resolutions.
+            {cases.length} total exception{cases.length === 1 ? "" : "s"} investigated by the autonomous agent. Review agent findings, inspect evidence, and authorize resolutions.
           </p>
         </div>
 
-        <Button variant="outline" size="md" onClick={() => onNavigate("overview")}>
+        <Button variant="outline" size="md" pill onClick={() => onNavigate("overview")}>
           ← Back to Overview
         </Button>
       </div>
@@ -139,15 +139,17 @@ export const ExceptionsView: React.FC<ExceptionsViewProps> = ({
             <Button
               variant="primary"
               size="lg"
+              pill
               onClick={() => onSelectCase(flagshipCase.caseId)}
               icon={
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14"></path>
+                  <path d="M12 5l7 7-7 7"></path>
                 </svg>
               }
+              iconPosition="right"
             >
-              Investigate {flagshipCase.bankTxId}
+              Investigate EC007 ($15,000 Anomaly)
             </Button>
             <span style={{ fontSize: "11px", color: "var(--cp-text-muted)" }}>
               Recommended: {flagshipCase.recommendationAction}

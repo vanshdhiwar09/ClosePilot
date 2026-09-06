@@ -13,6 +13,7 @@ interface AppShellProps {
   exceptionCount?: number;
   investigationCount?: number;
   evidenceCount?: number;
+  onResetSession?: () => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -24,6 +25,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   exceptionCount,
   investigationCount,
   evidenceCount,
+  onResetSession,
 }) => {
   return (
     <div
@@ -34,7 +36,12 @@ export const AppShell: React.FC<AppShellProps> = ({
         backgroundColor: "var(--cp-bg-canvas)",
       }}
     >
-      <AppHeader periodName={periodName} activeStep={activeStep} />
+      <AppHeader
+        periodName={periodName}
+        activeStep={activeStep}
+        openExceptionsCount={exceptionCount}
+        onResetSession={onResetSession}
+      />
 
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         <AppSidebar

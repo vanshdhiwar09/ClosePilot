@@ -10,6 +10,7 @@ import { EvidenceItem } from "../schemas/evidence-item";
 import { MatchResult } from "./types";
 import { DuplicateGroup } from "./duplicates";
 import { AccountBaseline, checkTransactionAnomaly } from "./anomaly";
+import { parseCents } from "../utils/money";
 import {
   createCalculationEvidence,
   createDocumentEvidence,
@@ -285,6 +286,16 @@ export function classifyExceptions(
   let overallStatus: "matched" | "exception" | "review_required";
   let autoResolutionAllowed = false;
 
+  // Policy guard for high-value / unverified account baseline transactions:
+  // Under accounting controls and HIGH_VALUE_ANOMALY_GUARD, exact matches exceeding
+  // the high-value policy threshold ($10,000.00) cannot autonomously close without human review.
+  const HIGH_VALUE_THRESHOLD_CENTS = 1000000n; // $10,000.00
+  const txAmountCents = parseCents(bankTx.amount);
+  const baseline = accountBaselines?.get(bankTx.accountId);
+  const isHighValueOrUnverified =
+    txAmountCents >= HIGH_VALUE_THRESHOLD_CENTS ||
+    (baseline !== undefined && baseline.sampleCount < 2 && txAmountCents >= HIGH_VALUE_THRESHOLD_CENTS);
+
   if (exceptions.length > 0) {
     overallStatus = "exception";
     autoResolutionAllowed = false;
@@ -292,8 +303,13 @@ export function classifyExceptions(
     overallStatus = "review_required";
     autoResolutionAllowed = false;
   } else if (matchResult.status === "exact_match") {
-    overallStatus = "matched";
-    autoResolutionAllowed = true;
+    if (isHighValueOrUnverified) {
+      overallStatus = "review_required";
+      autoResolutionAllowed = false;
+    } else {
+      overallStatus = "matched";
+      autoResolutionAllowed = true;
+    }
   } else {
     overallStatus = "review_required";
     autoResolutionAllowed = false;

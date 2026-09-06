@@ -9,6 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   icon?: React.ReactNode;
   iconPosition?: "left" | "right";
+  pill?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -17,6 +18,7 @@ export const Button: React.FC<ButtonProps> = ({
   size = "md",
   icon,
   iconPosition = "left",
+  pill = false,
   style,
   disabled,
   ...props
@@ -84,7 +86,7 @@ export const Button: React.FC<ButtonProps> = ({
         backgroundColor: bg,
         border,
         color: text,
-        borderRadius: "var(--cp-radius-sm)",
+        borderRadius: pill ? "var(--cp-radius-pill)" : "var(--cp-radius-sm)",
         fontSize,
         fontWeight: 500,
         letterSpacing: "-0.01em",

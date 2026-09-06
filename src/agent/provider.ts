@@ -193,6 +193,26 @@ export class DeterministicMockProvider implements InvestigationModelProvider {
       };
     }
 
+    // Exact match requiring human review (e.g. high-value policy authorization)
+    if (exceptions.length === 0 && caseDetail.candidateLedgerEntries.length === 1 && primaryCandidate) {
+      const candidateId = primaryCandidate.id;
+      const formattedAmount = formatCurrency(bankTx.amount);
+      return {
+        summary: `Transaction ${bankTx.id} for ${formattedAmount} matches ledger entry ${candidateId} but requires human review under approval policy.`,
+        rootCause: `Transaction amount ${formattedAmount} matches ledger entry ${candidateId} exactly; human review policy mandated for high-value authorization.`,
+        reasoning: [
+          `Exact amount ${formattedAmount} and reference match candidate ${candidateId}.`,
+          "Policy requires controller review and explicit sign-off for high-value transactions.",
+        ],
+        recommendedAction: "APPROVE_MATCH",
+        targetLedgerEntryId: candidateId,
+        suggestedReason: `Approve matched transaction ${bankTx.id} with ledger entry ${candidateId} following controller sign-off.`,
+        confidence: "HIGH",
+        riskLevel: "HIGH",
+        citedEvidenceIds: availableEvidenceIds,
+      };
+    }
+
     // Ambiguous candidates
     return {
       summary: `Transaction ${bankTx.id} has multiple qualifying candidates [${candidateIds.join(", ")}].`,

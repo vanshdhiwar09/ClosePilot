@@ -11,7 +11,7 @@ import {
 } from "../../workflow/reconciliation-workflow";
 import { runEvaluation } from "../../evaluation/runner";
 import { EvaluationRunReport } from "../../evaluation/types";
-import { generateClosePackage } from "../../review/close-package";
+import { generateClosePackage, formatClosePackageMarkdown } from "../../review/close-package";
 import { HumanReviewSession, VALID_TRANSITIONS } from "../../review/state-machine";
 import {
   HumanReviewAction,
@@ -29,9 +29,17 @@ import {
   PolicyGuardrailViewModel,
   DecisionHistoryViewModel,
   EvidenceDocumentViewModel,
+  ClosePackageViewModel,
+  CaseCloseRecordViewModel,
+  EvidenceLockerViewModel,
+  GeneratedEvidenceItemViewModel,
+  MissingEvidenceCaseViewModel,
   HumanReviewState,
 } from "./types";
 import { EvidenceItem } from "../../schemas/evidence-item";
+import { bankTransactionSchema } from "../../schemas/bank-transaction";
+import { ledgerEntrySchema } from "../../schemas/ledger-entry";
+import { supportingDocumentSchema } from "../../schemas/supporting-document";
 
 /**
  * Maps machine exception types into human-friendly finance operations labels.
@@ -86,10 +94,220 @@ export function formatCurrencyString(amount: string): string {
 
 export type SharedWorkflowState = {
   workflowResult: EndToEndWorkflowResult;
-  evalReport: EvaluationRunReport;
+  evalReport?: EvaluationRunReport;
+  hasGroundTruth?: boolean;
+  activeDataset?: {
+    label: string;
+    bankTransactionsCount: number;
+    ledgerEntriesCount: number;
+    documentsCount: number;
+    documents: any[];
+  };
 };
 
 let cachedState: SharedWorkflowState | null = null;
+
+export type ReconciliationDatasetValidationResult = {
+  isValid: boolean;
+  errors: string[];
+  datasetLabel?: string;
+  data?: Record<string, unknown>;
+  summary?: {
+    bankTransactionCount: number;
+    ledgerEntryCount: number;
+    documentCount: number;
+    chartOfAccountCount: number;
+  };
+};
+
+/**
+ * Validates a ClosePilot reconciliation JSON string or object entirely client-side.
+ * Returns detailed field-level errors if validation fails.
+ */
+export function validateReconciliationJSON(input: string | unknown): ReconciliationDatasetValidationResult {
+  let parsed: any;
+  if (typeof input === "string") {
+    try {
+      parsed = JSON.parse(input);
+    } catch (err: any) {
+      return {
+        isValid: false,
+        errors: [`Invalid JSON syntax: ${err.message}`],
+      };
+    }
+  } else {
+    parsed = input;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {
+      isValid: false,
+      errors: ["Reconciliation dataset must be a valid JSON object."],
+    };
+  }
+
+  const errors: string[] = [];
+
+  // 1. Bank Transactions
+  if (!Array.isArray(parsed.bankTransactions) || parsed.bankTransactions.length === 0) {
+    errors.push("Missing or empty 'bankTransactions' array.");
+  } else {
+    for (let i = 0; i < parsed.bankTransactions.length; i++) {
+      const item = parsed.bankTransactions[i];
+      const res = bankTransactionSchema.safeParse(item);
+      if (!res.success) {
+        const idStr = item && typeof item === "object" && item.id ? ` (ID: ${item.id})` : "";
+        errors.push(`bankTransactions[${i}]${idStr}: ${res.error.errors.map((e) => `${e.path.join(".") || "field"}: ${e.message}`).join(", ")}`);
+        if (errors.length >= 6) {
+          errors.push("... additional validation errors truncated");
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Ledger Entries
+  if (!Array.isArray(parsed.ledgerEntries) || parsed.ledgerEntries.length === 0) {
+    errors.push("Missing or empty 'ledgerEntries' array.");
+  } else {
+    for (let i = 0; i < parsed.ledgerEntries.length; i++) {
+      const item = parsed.ledgerEntries[i];
+      const res = ledgerEntrySchema.safeParse(item);
+      if (!res.success) {
+        const idStr = item && typeof item === "object" && item.id ? ` (ID: ${item.id})` : "";
+        errors.push(`ledgerEntries[${i}]${idStr}: ${res.error.errors.map((e) => `${e.path.join(".") || "field"}: ${e.message}`).join(", ")}`);
+        if (errors.length >= 10) {
+          errors.push("... additional validation errors truncated");
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Supporting Documents (optional array)
+  if (parsed.documents !== undefined) {
+    if (!Array.isArray(parsed.documents)) {
+      errors.push("'documents' must be an array when provided.");
+    } else {
+      for (let i = 0; i < parsed.documents.length; i++) {
+        const res = supportingDocumentSchema.safeParse(parsed.documents[i]);
+        if (!res.success) {
+          errors.push(`documents[${i}]: ${res.error.errors.map((e) => `${e.path.join(".") || "field"}: ${e.message}`).join(", ")}`);
+        }
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    return {
+      isValid: false,
+      errors,
+    };
+  }
+
+  return {
+    isValid: true,
+    errors: [],
+    datasetLabel: parsed.description || `ClosePilot reconciliation dataset (${parsed.fixtureVersion || "custom"})`,
+    data: parsed as Record<string, unknown>,
+    summary: {
+      bankTransactionCount: parsed.bankTransactions.length,
+      ledgerEntryCount: parsed.ledgerEntries.length,
+      documentCount: Array.isArray(parsed.documents) ? parsed.documents.length : 0,
+      chartOfAccountCount: Array.isArray(parsed.chartOfAccounts) ? parsed.chartOfAccounts.length : 0,
+    },
+  };
+}
+
+/**
+ * Resets the in-memory reconciliation session.
+ */
+export function resetReconciliationSession(): void {
+  cachedState = null;
+}
+
+/**
+ * Starts a reconciliation session from either a custom uploaded dataset or the demo dataset.
+ */
+export async function startReconciliationSession(
+  customFixtureData?: Record<string, unknown>,
+  datasetLabel?: string
+): Promise<SharedWorkflowState> {
+  const fixtureData = customFixtureData || (fixtureJson as Record<string, unknown>);
+  const isDemo = !customFixtureData;
+
+  const fixtureVersion = (fixtureData as any).fixtureVersion || "custom";
+
+  const hasCustomGroundTruth =
+    !isDemo &&
+    Array.isArray((fixtureData as any).evaluationCases) &&
+    (fixtureData as any).evaluationCases.length > 0 &&
+    (fixtureData as any).evaluationCases.every(
+      (ec: any) => ec.expectedStatus !== undefined && ec.bankTransactionId !== undefined
+    );
+
+  const hasGroundTruth = isDemo || hasCustomGroundTruth;
+
+  const evaluationCases = isDemo
+    ? (groundTruthJson as any).evaluationCases
+    : hasCustomGroundTruth
+    ? (fixtureData as any).evaluationCases
+    : ((fixtureData as any).bankTransactions || []).map((b: any, index: number) => ({
+        id: `EC${String(index + 1).padStart(3, "0")}`,
+        fixtureVersion,
+        bankTransactionId: b.id,
+        expectedLedgerEntryIds: [],
+        expectedStatus: "review_required",
+        expectedAutoResolutionAllowed: false,
+        notes: `Session case for transaction ${b.id}`,
+      }));
+
+  const groundTruthData = isDemo
+    ? (groundTruthJson as Record<string, unknown>)
+    : hasCustomGroundTruth
+    ? {
+        fixtureVersion,
+        description: datasetLabel || (fixtureData as any).description || "Custom Ground Truth",
+        evaluationCases,
+      }
+    : {
+        fixtureVersion,
+        description: datasetLabel || "Uploaded ClosePilot reconciliation JSON",
+        evaluationCases,
+      };
+
+  const workflowResult = await runEndToEndReconciliationWorkflow({
+    fixtureData,
+    groundTruthData,
+  });
+
+  const evalReport = hasGroundTruth
+    ? runEvaluation({
+        fixtureData,
+        groundTruthData,
+      })
+    : undefined;
+
+  const rawBankTxs = (fixtureData as any).bankTransactions || [];
+  const rawLedgerEntries = (fixtureData as any).ledgerEntries || [];
+  const rawDocs = (fixtureData as any).documents || [];
+
+  cachedState = {
+    workflowResult,
+    evalReport,
+    hasGroundTruth,
+    activeDataset: {
+      label: isDemo
+        ? "January 2024 Close (2024.1)"
+        : datasetLabel || (fixtureData as any).description || "Uploaded ClosePilot reconciliation JSON",
+      bankTransactionsCount: rawBankTxs.length,
+      ledgerEntriesCount: rawLedgerEntries.length,
+      documentsCount: rawDocs.length,
+      documents: rawDocs,
+    },
+  };
+  return cachedState;
+}
 
 /**
  * Executes the canonical workflow and evaluation pipeline once and caches the result.
@@ -98,32 +316,29 @@ export async function getWorkflowState(forceRefresh = false): Promise<SharedWork
   if (cachedState && !forceRefresh) {
     return cachedState;
   }
-
-  const workflowResult = await runEndToEndReconciliationWorkflow({
-    fixtureData: fixtureJson as Record<string, unknown>,
-    groundTruthData: groundTruthJson as Record<string, unknown>,
-  });
-
-  const evalReport = runEvaluation({
-    fixtureData: fixtureJson as Record<string, unknown>,
-    groundTruthData: groundTruthJson as Record<string, unknown>,
-  });
-
-  cachedState = { workflowResult, evalReport };
-  return cachedState;
+  return startReconciliationSession();
 }
 
 /**
  * Builds the OverviewViewModel from the current workflow session and evaluation report.
  */
 export function buildOverviewViewModel(state: SharedWorkflowState): OverviewDataViewModel {
-  const { workflowResult, evalReport } = state;
+  const { workflowResult, evalReport, hasGroundTruth } = state;
   const closePackage = workflowResult.closePackage;
   const summary = closePackage.summary;
 
-  const accuracyPercentage = (evalReport.metrics.accuracy * 100).toFixed(1);
-  const agreementAccuracyStr = `${accuracyPercentage}%`;
-  const falseAutoCloseStr = `${(evalReport.metrics.falseAutoCloseRate * 100).toFixed(1)}%`;
+  const agreementAccuracyStr = hasGroundTruth && evalReport
+    ? `${(evalReport.metrics.accuracy * 100).toFixed(1)}%`
+    : "N/A";
+  const agreementDetailStr = hasGroundTruth && evalReport
+    ? `${evalReport.metrics.totalAgreements}/${evalReport.metrics.totalCases} verified agreement with ground truth`
+    : "Ground Truth: Not provided";
+  const falseAutoCloseStr = hasGroundTruth && evalReport
+    ? `${(evalReport.metrics.falseAutoCloseRate * 100).toFixed(1)}%`
+    : "N/A";
+  const falseAutoCloseDetailStr = hasGroundTruth && evalReport
+    ? "Zero false closures"
+    : "Evaluation requires ground truth dataset";
 
   const exceptionsDistribution: ExceptionDistributionItem[] = Object.entries(
     summary.exceptionCounts
@@ -168,16 +383,16 @@ export function buildOverviewViewModel(state: SharedWorkflowState): OverviewData
   return {
     period: {
       periodId: closePackage.period,
-      periodName: "January 2024 (2024.1)",
+      periodName: state.activeDataset?.label || "January 2024 (2024.1)",
       workflowStatus: summary.unresolvedCases > 0 ? "Human Review Required" : "Reconciliation Complete",
       activeStep: "investigate",
       generatedAt: closePackage.generatedAt,
     },
     kpis: {
       agreementAccuracy: agreementAccuracyStr,
-      agreementDetail: `${evalReport.metrics.totalAgreements}/${evalReport.metrics.totalCases} verified agreement with ground truth`,
+      agreementDetail: agreementDetailStr,
       falseAutoCloseRate: falseAutoCloseStr,
-      falseAutoCloseDetail: "Zero false closures",
+      falseAutoCloseDetail: falseAutoCloseDetailStr,
       autoResolvedCount: summary.automaticallyResolvedCases,
       autoResolvedAmount: formatCurrencyString(summary.totalReconciledAmount),
       humanReviewCount: summary.unresolvedCases,
@@ -187,9 +402,9 @@ export function buildOverviewViewModel(state: SharedWorkflowState): OverviewData
     financials: {
       totalReconciledAmount: formatCurrencyString(summary.totalReconciledAmount),
       totalUnreconciledAmount: formatCurrencyString(summary.totalUnreconciledAmount),
-      bankTransactionsCount: (fixtureJson as any).bankTransactions.length,
-      ledgerEntriesCount: (fixtureJson as any).ledgerEntries.length,
-      supportingDocumentsCount: (fixtureJson as any).documents.length,
+      bankTransactionsCount: state.activeDataset?.bankTransactionsCount ?? summary.totalCases,
+      ledgerEntriesCount: state.activeDataset?.ledgerEntriesCount ?? summary.totalCases,
+      supportingDocumentsCount: state.activeDataset?.documentsCount ?? 0,
     },
     exceptionsDistribution,
     transactions,
@@ -511,7 +726,7 @@ export function executeReviewAction(
  */
 export function getEvidenceDocuments(state: SharedWorkflowState): EvidenceDocumentViewModel[] {
   const { workflowResult } = state;
-  const fixtureDocs = (fixtureJson as any).documents || [];
+  const fixtureDocs = state.activeDataset?.documents || (fixtureJson as any).documents || [];
   const cases = workflowResult.closePackage.cases;
 
   return fixtureDocs.map((doc: any) => {
@@ -539,4 +754,195 @@ export function getEvidenceDocuments(state: SharedWorkflowState): EvidenceDocume
       linkedCases: Array.from(new Set(linkedCases)),
     };
   });
+}
+
+/**
+ * Builds the complete, audit-ready ClosePackageViewModel directly from the domain ClosePackage.
+ */
+export function getClosePackageViewModel(state: SharedWorkflowState): ClosePackageViewModel {
+  const { workflowResult } = state;
+  const pkg = workflowResult.closePackage;
+  const s = pkg.summary;
+  const traces = workflowResult.traces;
+
+  const cases: CaseCloseRecordViewModel[] = pkg.cases.map((c) => {
+    const trace = traces.find((t) => t.caseId === c.caseId);
+    const inv = c.investigation;
+
+    // Policy evaluations
+    const policyEvaluations: PolicyGuardrailViewModel[] =
+      trace && trace.policyEvaluations && trace.policyEvaluations.length > 0
+        ? trace.policyEvaluations.map((p) => ({
+            policyRule: p.policyRule,
+            isPermitted: p.isPermitted,
+            policyReason: p.policyReason,
+            forcedHumanReview: p.forcedHumanReview,
+            timestamp: p.timestamp,
+          }))
+        : inv
+        ? [
+            {
+              policyRule: inv.policyValidation.policyRule,
+              isPermitted: inv.policyValidation.isPermitted,
+              policyReason: inv.policyValidation.policyReason,
+              forcedHumanReview: inv.policyValidation.forcedHumanReview,
+              timestamp: inv.investigatedAt,
+            },
+          ]
+        : [];
+
+    const decisionHistory: DecisionHistoryViewModel[] = c.decisionHistory.map((d) => ({
+      id: d.id,
+      action: d.action,
+      reviewerId: d.reviewer.id,
+      reviewerName: d.reviewer.name || d.reviewer.id,
+      reviewerRole: d.reviewer.role || "Reviewer",
+      reason: d.reason,
+      timestamp: d.timestamp,
+      fromState: d.previousState,
+      toState: d.newState,
+    }));
+
+    const candidateEntries = c.candidateLedgerEntries.map((le) => ({
+      id: le.id,
+      date: le.entryDate,
+      amount: formatCurrencyString(le.debit !== "0.00" ? le.debit : le.credit),
+      reference: le.reference,
+    }));
+
+    return {
+      caseId: c.caseId,
+      bankTransactionId: c.bankTransactionId,
+      date: c.sourceTransaction.transactionDate,
+      vendor: c.sourceTransaction.counterparty || c.sourceTransaction.description,
+      description: c.sourceTransaction.description,
+      amount: formatCurrencyString(c.sourceTransaction.amount),
+      finalStatus: c.finalStatus,
+      isClosed: c.isClosed,
+      closureReason: c.closureReason,
+      exceptions: c.exceptions.map((e) => e.type),
+      evidenceIds: c.evidence.map((e) => e.id),
+      decisionCount: c.decisionHistory.length,
+      reconciliationStatus: c.reconciliationResult.status,
+      matchMethod: c.reconciliationResult.matchMethod,
+      confidence: c.reconciliationResult.confidence,
+      investigationSummary: inv
+        ? {
+            investigationId: inv.investigationId,
+            outcome: inv.outcome,
+            rootCause: inv.rootCause,
+            recommendationAction: inv.recommendation.action,
+            recommendationReason: inv.recommendation.suggestedReason,
+            confidence: inv.confidence,
+            riskLevel: inv.riskLevel,
+            policyRule: inv.policyValidation.policyRule,
+            isPermitted: inv.policyValidation.isPermitted,
+            policyReason: inv.policyValidation.policyReason,
+          }
+        : undefined,
+      policyEvaluations,
+      toolCallsCount: trace?.toolCalls.length || (inv?.toolCalls.length ?? 0),
+      decisionHistory,
+      outstandingRequirements: c.outstandingRequirements,
+      candidateEntries,
+    };
+  });
+
+  return {
+    packageId: pkg.packageId,
+    period: pkg.period,
+    workflowVersion: pkg.workflowVersion,
+    engineVersion: pkg.metadata.engineVersion || "0.1.0",
+    environment: pkg.metadata.environment || "local_synthetic",
+    generatedAt: pkg.generatedAt,
+    allCasesClosed: s.allCasesClosed,
+    totalCases: s.totalCases,
+    automaticallyResolvedCases: s.automaticallyResolvedCases,
+    humanReviewedCases: s.humanReviewedCases,
+    approvedCases: s.approvedCases,
+    rejectedCases: s.rejectedCases,
+    unresolvedCases: s.unresolvedCases,
+    totalReconciledAmount: formatCurrencyString(s.totalReconciledAmount),
+    totalUnreconciledAmount: formatCurrencyString(s.totalUnreconciledAmount),
+    exceptionCounts: s.exceptionCounts,
+    cases,
+    markdownReport: formatClosePackageMarkdown(pkg),
+  };
+}
+
+/**
+ * Builds the complete EvidenceLockerViewModel containing supporting documents,
+ * generated workflow audit evidence, and missing evidence cases.
+ */
+export function getEvidenceLockerViewModel(state: SharedWorkflowState): EvidenceLockerViewModel {
+  const documents = getEvidenceDocuments(state);
+  const cases = state.workflowResult.closePackage.cases;
+  const session = state.workflowResult.session;
+
+  const generatedEvidence: GeneratedEvidenceItemViewModel[] = [];
+  const seenEvidenceIds = new Set<string>();
+
+  for (const c of cases) {
+    for (const ev of c.evidence) {
+      if (seenEvidenceIds.has(ev.id)) continue;
+      seenEvidenceIds.add(ev.id);
+
+      let summaryText = `Kind: ${ev.kind}`;
+      if (ev.kind === "source_record") {
+        summaryText = `Source ${(ev.payload as any)?.recordType || "record"} [${ev.sourceId || ev.id}]`;
+      } else if (ev.kind === "calculation") {
+        summaryText = (ev.payload as any)?.reason || `Calculation ${(ev.payload as any)?.calculationType}`;
+      } else if (ev.kind === "match_rule") {
+        summaryText = (ev.payload as any)?.description || `Rule ${(ev.payload as any)?.rule}`;
+      } else if (ev.kind === "validation" || (ev.kind as string) === "missing_document") {
+        summaryText = (ev.payload as any)?.reason || "Missing supporting document citation";
+      } else if (ev.kind === "document") {
+        summaryText = `Document: ${(ev.payload as any)?.fileName || ev.sourceId}`;
+      }
+
+      generatedEvidence.push({
+        id: ev.id,
+        kind: ev.kind,
+        subjectType: ev.subjectType,
+        subjectId: ev.subjectId,
+        sourceId: ev.sourceId,
+        locator: ev.locator,
+        summary: summaryText,
+        caseId: c.caseId,
+        createdAt: ev.createdAt,
+        payload: ev.payload || {},
+      });
+    }
+  }
+
+  // Missing evidence cases (EC006 and any in WAITING_FOR_EVIDENCE)
+  const missingEvidenceCases: MissingEvidenceCaseViewModel[] = [];
+  for (const c of cases) {
+    const ctx = session.getCase(c.caseId);
+    const hasMissingDocException = c.exceptions.some((e) => e.type === "missing_documentation");
+    const isWaitingForEvidence = ctx.currentState === "WAITING_FOR_EVIDENCE";
+
+    if (hasMissingDocException || isWaitingForEvidence) {
+      const missReason = hasMissingDocException
+        ? `Ledger entry has no linked supporting documents (missing invoice for ${c.sourceTransaction.counterparty || c.sourceTransaction.description})`
+        : "Human reviewer requested documentation verification before approval";
+
+      missingEvidenceCases.push({
+        caseId: c.caseId,
+        bankTxId: c.bankTransactionId,
+        vendor: c.sourceTransaction.counterparty || c.sourceTransaction.description,
+        amount: formatCurrencyString(c.sourceTransaction.amount),
+        date: c.sourceTransaction.transactionDate,
+        reason: missReason,
+        status: ctx.currentState as HumanReviewState,
+        requiredAction: isWaitingForEvidence ? "Supply Evidence" : "Request Evidence",
+      });
+    }
+  }
+
+  return {
+    documents,
+    generatedEvidence,
+    missingEvidenceCases,
+  };
 }

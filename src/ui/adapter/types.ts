@@ -199,3 +199,98 @@ export interface EvidenceDocumentViewModel {
   type: string;
   linkedCases: string[];
 }
+
+// ==========================================
+// Phase 7C: Close Package & Evidence Locker Types
+// ==========================================
+
+export type CaseCloseRecordViewModel = {
+  caseId: string;
+  bankTransactionId: string;
+  date: string;
+  vendor: string;
+  description: string;
+  amount: string;
+  finalStatus: "closed" | "rejected" | "unresolved";
+  isClosed: boolean;
+  closureReason: string;
+  exceptions: string[];
+  evidenceIds: string[];
+  decisionCount: number;
+  reconciliationStatus: string;
+  matchMethod: string;
+  confidence: string;
+  investigationSummary?: {
+    investigationId: string;
+    outcome: string;
+    rootCause: string;
+    recommendationAction: string;
+    recommendationReason: string;
+    confidence: string;
+    riskLevel: string;
+    policyRule: string;
+    isPermitted: boolean;
+    policyReason: string;
+  };
+  policyEvaluations: PolicyGuardrailViewModel[];
+  toolCallsCount: number;
+  decisionHistory: DecisionHistoryViewModel[];
+  outstandingRequirements: string[];
+  candidateEntries: Array<{
+    id: string;
+    date: string;
+    amount: string;
+    reference?: string;
+  }>;
+};
+
+export type ClosePackageViewModel = {
+  packageId: string;
+  period: string;
+  workflowVersion: string;
+  engineVersion: string;
+  environment: string;
+  generatedAt: string;
+  allCasesClosed: boolean;
+  totalCases: number;
+  automaticallyResolvedCases: number;
+  humanReviewedCases: number;
+  approvedCases: number;
+  rejectedCases: number;
+  unresolvedCases: number;
+  totalReconciledAmount: string;
+  totalUnreconciledAmount: string;
+  exceptionCounts: Record<string, number>;
+  cases: CaseCloseRecordViewModel[];
+  markdownReport: string;
+};
+
+export type GeneratedEvidenceItemViewModel = {
+  id: string;
+  kind: string;
+  subjectType: string;
+  subjectId: string;
+  sourceId?: string;
+  locator?: string;
+  summary: string;
+  caseId: string;
+  createdAt: string;
+  payload: Record<string, unknown>;
+};
+
+export type MissingEvidenceCaseViewModel = {
+  caseId: string;
+  bankTxId: string;
+  vendor: string;
+  amount: string;
+  date: string;
+  reason: string;
+  status: HumanReviewState;
+  requiredAction: string;
+};
+
+export type EvidenceLockerViewModel = {
+  documents: EvidenceDocumentViewModel[];
+  generatedEvidence: GeneratedEvidenceItemViewModel[];
+  missingEvidenceCases: MissingEvidenceCaseViewModel[];
+};

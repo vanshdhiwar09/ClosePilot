@@ -7,9 +7,19 @@ import { NavTabId } from "../components/layout/AppSidebar";
 
 interface ReconciliationViewProps {
   onNavigate: (tab: NavTabId) => void;
+  summary?: {
+    bankTransactionsCount: number;
+    ledgerEntriesCount: number;
+    autoResolvedCount: number;
+    periodName?: string;
+  };
 }
 
-export const ReconciliationView: React.FC<ReconciliationViewProps> = ({ onNavigate }) => {
+export const ReconciliationView: React.FC<ReconciliationViewProps> = ({ onNavigate, summary }) => {
+  const bankCount = summary?.bankTransactionsCount ?? 8;
+  const ledgerCount = summary?.ledgerEntriesCount ?? 10;
+  const autoCount = summary?.autoResolvedCount ?? 1;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -18,10 +28,10 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({ onNaviga
             Deterministic Reconciliation Engine
           </h1>
           <p style={{ fontSize: "13px", color: "var(--cp-text-secondary)", marginTop: "4px" }}>
-            Pipeline status: Ingested 8 bank transactions and 10 ledger entries. 1 exact match auto-reconciled.
+            Pipeline status: Ingested {bankCount} bank transaction{bankCount === 1 ? "" : "s"} and {ledgerCount} ledger entr{ledgerCount === 1 ? "y" : "ies"}. {autoCount} exact match{autoCount === 1 ? "" : "es"} auto-reconciled.
           </p>
         </div>
-        <Button variant="outline" size="md" onClick={() => onNavigate("overview")}>
+        <Button variant="outline" size="md" pill onClick={() => onNavigate("overview")}>
           ← Back to Overview
         </Button>
       </div>

@@ -1,17 +1,21 @@
 // src/ui/App.tsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
+import { AppHeader } from "./components/layout/AppHeader";
 import { NavTabId } from "./components/layout/AppSidebar";
-import { HumanReviewAction } from "./adapter/types";
+import { HumanReviewAction, WorkflowStepId } from "./adapter/types";
 import {
-  getWorkflowState,
+  startReconciliationSession,
+  resetReconciliationSession,
   buildOverviewViewModel,
   getExceptionCases,
   getCaseInvestigationDetail,
   executeReviewAction,
-  getEvidenceDocuments,
+  getEvidenceLockerViewModel,
+  getClosePackageViewModel,
   SharedWorkflowState,
 } from "./adapter/data-adapter";
+import { StartCloseView } from "./views/StartCloseView";
 import { OverviewView } from "./views/OverviewView";
 import { ReconciliationView } from "./views/ReconciliationView";
 import { ExceptionsView } from "./views/ExceptionsView";
@@ -21,33 +25,54 @@ import { EvidenceView } from "./views/EvidenceView";
 import { ClosePackageView } from "./views/ClosePackageView";
 
 export const App: React.FC = () => {
+  const [isSessionStarted, setIsSessionStarted] = useState(false);
   const [currentTab, setCurrentTab] = useState<NavTabId>("overview");
   const [sharedState, setSharedState] = useState<SharedWorkflowState | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    getWorkflowState()
-      .then((state) => {
-        if (mounted) {
-          setSharedState(state);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (mounted) {
-          setError(err.message || "Failed to initialize ClosePilot reconciliation workspace.");
-          setLoading(false);
-        }
-      });
+  const handleStartDemoSession = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await startReconciliationSession();
+      setSharedState(state);
+      setIsSessionStarted(true);
+      setCurrentTab("overview");
+      setSelectedCaseId(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to execute reconciliation on demo dataset.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const handleStartCustomSession = async (data: Record<string, unknown>, label: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await startReconciliationSession(data, label);
+      setSharedState(state);
+      setIsSessionStarted(true);
+      setCurrentTab("overview");
+      setSelectedCaseId(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to execute reconciliation on custom dataset.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSession = () => {
+    resetReconciliationSession();
+    setSharedState(null);
+    setIsSessionStarted(false);
+    setSelectedCaseId(null);
+    setCurrentTab("overview");
+    setError(null);
+  };
 
   const handleApplyAction = async (
     caseId: string,
@@ -67,45 +92,7 @@ export const App: React.FC = () => {
     setVersion((v) => v + 1);
   };
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "var(--cp-bg-canvas)",
-          gap: "12px",
-        }}
-      >
-        <div
-          style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "6px",
-            backgroundColor: "var(--cp-text-primary)",
-            color: "var(--cp-text-inverted)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-            <polyline points="2 17 12 22 22 17"></polyline>
-            <polyline points="2 12 12 17 22 12"></polyline>
-          </svg>
-        </div>
-        <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--cp-text-secondary)" }}>
-          Initializing ClosePilot Reconciliation Engine...
-        </span>
-      </div>
-    );
-  }
-
-  if (error || !sharedState) {
+  if (error) {
     return (
       <div
         style={{
@@ -120,11 +107,11 @@ export const App: React.FC = () => {
         }}
       >
         <div style={{ color: "var(--cp-status-danger-text)", fontSize: "16px", fontWeight: 600 }}>
-          Error loading ClosePilot workspace
+          Error running reconciliation workflow
         </div>
         <p style={{ color: "var(--cp-text-secondary)", fontSize: "13px" }}>{error}</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={handleResetSession}
           style={{
             padding: "6px 14px",
             borderRadius: "var(--cp-radius-sm)",
@@ -134,15 +121,38 @@ export const App: React.FC = () => {
             cursor: "pointer",
           }}
         >
-          Retry
+          Return to Start Screen
         </button>
       </div>
+    );
+  }
+
+  if (!isSessionStarted || !sharedState) {
+    return (
+      <StartCloseView
+        onLoadDemo={handleStartDemoSession}
+        onLoadCustom={handleStartCustomSession}
+        isLoading={loading}
+      />
     );
   }
 
   const overviewData = buildOverviewViewModel(sharedState);
   const exceptionCases = getExceptionCases(sharedState);
   const openExceptionsCount = exceptionCases.filter((c) => c.reviewStatus === "REVIEW_REQUIRED").length;
+
+  let activeStep: WorkflowStepId = "ingest";
+  if (selectedCaseId) {
+    activeStep = "resolve";
+  } else if (currentTab === "overview") {
+    activeStep = "ingest";
+  } else if (currentTab === "reconciliation") {
+    activeStep = "match";
+  } else if (currentTab === "exceptions" || currentTab === "investigations" || currentTab === "evidence") {
+    activeStep = "investigate";
+  } else if (currentTab === "close-package") {
+    activeStep = "report";
+  }
 
   return (
     <AppShell
@@ -152,10 +162,11 @@ export const App: React.FC = () => {
         setCurrentTab(tab);
       }}
       periodName={overviewData.period.periodName}
-      activeStep={selectedCaseId ? "resolve" : overviewData.period.activeStep}
+      activeStep={activeStep}
       exceptionCount={openExceptionsCount}
       investigationCount={exceptionCases.length}
       evidenceCount={overviewData.financials.supportingDocumentsCount}
+      onResetSession={handleResetSession}
     >
       {selectedCaseId ? (
         <InvestigationDetailView
@@ -174,7 +185,17 @@ export const App: React.FC = () => {
               }}
             />
           )}
-          {currentTab === "reconciliation" && <ReconciliationView onNavigate={setCurrentTab} />}
+          {currentTab === "reconciliation" && (
+            <ReconciliationView
+              onNavigate={setCurrentTab}
+              summary={{
+                bankTransactionsCount: overviewData.financials.bankTransactionsCount,
+                ledgerEntriesCount: overviewData.financials.ledgerEntriesCount,
+                autoResolvedCount: overviewData.kpis.autoResolvedCount,
+                periodName: overviewData.period.periodName,
+              }}
+            />
+          )}
           {currentTab === "exceptions" && (
             <ExceptionsView
               cases={exceptionCases}
@@ -192,10 +213,17 @@ export const App: React.FC = () => {
           {currentTab === "evidence" && (
             <EvidenceView
               onNavigate={setCurrentTab}
-              documents={getEvidenceDocuments(sharedState)}
+              locker={getEvidenceLockerViewModel(sharedState)}
+              onSelectCase={(id) => setSelectedCaseId(id)}
             />
           )}
-          {currentTab === "close-package" && <ClosePackageView data={overviewData} onNavigate={setCurrentTab} />}
+          {currentTab === "close-package" && (
+            <ClosePackageView
+              closePackage={getClosePackageViewModel(sharedState)}
+              onNavigate={setCurrentTab}
+              onSelectCase={(id) => setSelectedCaseId(id)}
+            />
+          )}
         </>
       )}
     </AppShell>

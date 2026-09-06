@@ -27,14 +27,14 @@ export const InvestigationsView: React.FC<InvestigationsViewProps> = ({
               Autonomous Investigation Agent Runs
             </h1>
             <Badge variant="indigo" size="sm">
-              7 Completed Runs
+              {cases.length} Completed Run{cases.length === 1 ? "" : "s"}
             </Badge>
           </div>
           <p style={{ fontSize: "13px", color: "var(--cp-text-secondary)", marginTop: "4px" }}>
             Read-only autonomous investigations operate strictly above the accounting layer with zero mutation of financial state.
           </p>
         </div>
-        <Button variant="outline" size="md" onClick={() => onNavigate("overview")}>
+        <Button variant="outline" size="md" pill onClick={() => onNavigate("overview")}>
           ← Back to Overview
         </Button>
       </div>
