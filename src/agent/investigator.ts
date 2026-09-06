@@ -21,9 +21,11 @@ export type InvestigatorOptions = {
 
 export class AutonomousInvestigator {
   private readonly provider: InvestigationModelProvider;
+  private readonly maxToolCalls: number;
 
   constructor(options?: InvestigatorOptions) {
     this.provider = options?.modelProvider || new DeterministicMockProvider();
+    this.maxToolCalls = options?.maxToolCalls ?? 10;
   }
 
   /**
@@ -34,9 +36,11 @@ export class AutonomousInvestigator {
     toolbox: ReadOnlyInvestigationToolbox,
     options?: InvestigatorOptions
   ): Promise<InvestigationResult> {
-    const maxToolCalls = options?.maxToolCalls || 10;
+    const maxToolCalls = options?.maxToolCalls ?? this.maxToolCalls;
     const investigationId = `INV-${caseId}-${Date.now()}`;
     const investigatedAt = new Date().toISOString();
+
+    const startTime = performance.now();
 
     // Step 1: Load initial case context
     const caseDetail = toolbox.get_case(caseId);
@@ -44,6 +48,7 @@ export class AutonomousInvestigator {
 
     // Step 2: Auto-resolved cases bypass deep investigation
     if (caseDetail.autoResolutionAllowed && exceptions.length === 0) {
+      const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
       const result: InvestigationResult = {
         investigationId,
         caseId,
@@ -72,6 +77,11 @@ export class AutonomousInvestigator {
         },
         investigatedAt,
         toolCalls: toolbox.getRecordedToolCalls(),
+        metadata: {
+          modelProvider: this.provider.name,
+          durationMs,
+          autoResolutionAllowed: true,
+        },
       };
       return investigationResultSchema.parse(result);
     }
@@ -172,12 +182,14 @@ export class AutonomousInvestigator {
     const outcome = policy.isPermitted ? "COMPLETED" : "FAILED_POLICY_CHECK";
 
     // If policy rejected the recommendation, sanitize recommendation to force human review safely
-    let finalRecommendation = {
+    const rawModelRecommendation = {
       action: modelResponse.recommendedAction,
       targetLedgerEntryId: modelResponse.targetLedgerEntryId,
       suggestedReason: modelResponse.suggestedReason,
       requiredEvidenceTypes: modelResponse.requiredEvidenceTypes,
     };
+
+    let finalRecommendation = { ...rawModelRecommendation };
 
     if (!policy.isPermitted) {
       finalRecommendation = {
@@ -200,6 +212,7 @@ export class AutonomousInvestigator {
       ),
       reasoningTrace: modelResponse.reasoning,
       recommendation: finalRecommendation,
+      rawModelRecommendation,
       confidence: modelResponse.confidence,
       riskLevel: modelResponse.riskLevel,
       requiresHumanReview: true, // Non-auto-resolved cases always require human review
@@ -210,6 +223,7 @@ export class AutonomousInvestigator {
         modelProvider: this.provider.name,
         exceptionsDetected: exceptions,
         autoResolutionAllowed: caseDetail.autoResolutionAllowed,
+        durationMs: Math.round((performance.now() - startTime) * 100) / 100,
       },
     };
 

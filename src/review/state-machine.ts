@@ -82,10 +82,22 @@ export class HumanReviewSession {
         decisionHistory: [],
         evidence: [...input.reconciliationOutput.evidence], // starts with original evidence
         outstandingEvidenceRequests: [],
+        investigation: input.investigation,
       };
 
       this.cases.set(input.caseId, context);
     }
+  }
+
+  /**
+   * Attaches an advisory investigation result to a case without mutating review state or financial records.
+   */
+  public setInvestigation(caseId: string, investigation: any): void {
+    const ctx = this.cases.get(caseId);
+    if (!ctx) {
+      throw new CaseNotFoundError(caseId);
+    }
+    ctx.investigation = investigation;
   }
 
   /**
@@ -101,6 +113,7 @@ export class HumanReviewSession {
       decisionHistory: [...ctx.decisionHistory],
       evidence: [...ctx.evidence],
       outstandingEvidenceRequests: [...ctx.outstandingEvidenceRequests],
+      investigation: ctx.investigation,
     };
   }
 

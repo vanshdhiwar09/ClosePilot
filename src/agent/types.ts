@@ -116,6 +116,7 @@ export type InvestigationResult = {
   evidenceIds: string[];
   reasoningTrace: string[];
   recommendation: AgentRecommendation;
+  rawModelRecommendation?: AgentRecommendation;
   confidence: InvestigationConfidence;
   riskLevel: RiskLevel;
   requiresHumanReview: boolean;
@@ -135,6 +136,7 @@ export const investigationResultSchema = z.object({
   evidenceIds: z.array(z.string()),
   reasoningTrace: z.array(z.string()),
   recommendation: agentRecommendationSchema,
+  rawModelRecommendation: agentRecommendationSchema.optional(),
   confidence: investigationConfidenceSchema,
   riskLevel: riskLevelSchema,
   requiresHumanReview: z.boolean(),
@@ -143,6 +145,34 @@ export const investigationResultSchema = z.object({
   toolCalls: z.array(toolCallRecordSchema),
   metadata: z.record(z.unknown()).optional(),
 });
+
+// ==========================================
+// Agent Evaluation Metrics
+// ==========================================
+
+export type AgentEvaluationMetrics = {
+  totalCases: number;
+  investigatedCases: number;
+  skippedAutoResolvedCases: number;
+
+  // Seven specification evaluation metrics:
+  investigationCompletionRate: number; // completed / (totalCases - skippedAutoResolved)
+  recommendationAccuracy: number; // recommendations aligned with ground truth / investigatedCases
+  evidenceCitationValidity: number; // valid cited evidence items / total cited evidence items
+  policyViolationRate: number; // policy violations / investigatedCases
+  forcedHumanReviewRate: number; // forced reviews by policy / investigatedCases
+  averageInvestigationTimeMs: number; // total investigation duration / investigatedCases
+  averageToolCallsPerInvestigation: number; // total tool calls / investigatedCases
+
+  counts: {
+    totalToolCalls: number;
+    totalEvidenceCitations: number;
+    validEvidenceCitations: number;
+    policyViolationsCount: number;
+    forcedHumanReviewCount: number;
+    recommendationMatchesCount: number;
+  };
+};
 
 // ==========================================
 // Case Context for Tool Execution

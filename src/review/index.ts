@@ -4,4 +4,5 @@
 export * from "./types";
 export * from "./evidence";
 export * from "./state-machine";
+export * from "./queue";
 export * from "./close-package";

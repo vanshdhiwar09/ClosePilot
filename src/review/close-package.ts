@@ -104,6 +104,7 @@ export function generateClosePackage(
         : (ctx.currentState as HumanReviewState),
       decisionHistory: [...ctx.decisionHistory],
       outstandingRequirements: statusInfo.outstandingRequirements,
+      investigation: ctx.investigation,
     };
 
     caseRecords.push(record);
@@ -261,6 +262,25 @@ export function formatClosePackageMarkdown(pkg: ClosePackage): string {
       for (const r of c.ruleTrace) {
         out += `  - [${r.passed ? "PASS" : "FAIL"}] **${r.rule}**: ${r.description}\n`;
       }
+    }
+
+    if (c.investigation) {
+      const inv = c.investigation;
+      const duration =
+        typeof inv.metadata?.durationMs === "number"
+          ? inv.metadata.durationMs
+          : inv.toolCalls.reduce((s, t) => s + t.durationMs, 0);
+      out += `- **Autonomous Agent Investigation**:\n`;
+      out += `  - **Investigation ID**: \`${inv.investigationId}\` (${inv.outcome}, ${duration.toFixed(1)}ms)\n`;
+      out += `  - **Root Cause**: ${inv.rootCause}\n`;
+      out += `  - **Advisory Recommendation**: \`${inv.recommendation.action}\` (Confidence: \`${inv.confidence}\`, Risk: \`${inv.riskLevel}\`)\n`;
+      out += `  - **Recommendation Reason**: ${inv.recommendation.suggestedReason}\n`;
+      out += `  - **Policy Validation**: ${inv.policyValidation.isPermitted ? "✅ PERMITTED" : "⚠️ VIOLATION / FORCED HUMAN REVIEW"} — Rule: \`${inv.policyValidation.policyRule}\` (${inv.policyValidation.policyReason})\n`;
+      if (inv.rawModelRecommendation && inv.rawModelRecommendation.action !== inv.recommendation.action) {
+        out += `  - **Raw Model Action (Pre-Policy Override)**: \`${inv.rawModelRecommendation.action}\`\n`;
+      }
+      out += `  - **Evidence Cited by Agent**: [${inv.evidenceIds.join(", ")}]\n`;
+      out += `  - **Tool Calls Executed (${inv.toolCalls.length})**: ${inv.toolCalls.map((t) => `\`${t.toolName}\``).join(", ")}\n`;
     }
 
     if (c.decisionHistory.length > 0) {

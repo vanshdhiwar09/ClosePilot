@@ -142,11 +142,14 @@ export const humanReviewDecisionSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+import { InvestigationResult } from "../agent/types";
+
 export type CaseReviewInput = {
   caseId: string;
   bankTransaction: BankTransaction;
   reconciliationOutput: ReconcileTransactionOutput;
   candidateLedgerEntries?: LedgerEntry[];
+  investigation?: InvestigationResult;
 };
 
 export type CaseReviewContext = {
@@ -159,6 +162,7 @@ export type CaseReviewContext = {
   decisionHistory: HumanReviewDecision[];
   evidence: EvidenceItem[];
   outstandingEvidenceRequests: string[];
+  investigation?: InvestigationResult;
 };
 
 export type ApplyActionParams = {
@@ -193,6 +197,41 @@ export type CaseCloseRecord = {
   humanReviewState?: HumanReviewState;
   decisionHistory: HumanReviewDecision[];
   outstandingRequirements: string[];
+  investigation?: InvestigationResult;
+};
+
+// ==========================================
+// Review Queue Domain Types
+// ==========================================
+
+export type ReviewerGuidance = {
+  whatHappened: string;
+  whyFlagged: string[];
+  evidenceSummary: string;
+  agentInvestigationSummary?: string;
+  agentRecommendation?: string;
+  recommendationReason?: string;
+  riskLevel?: string;
+  confidence?: string;
+  isPolicyPermitted?: boolean;
+  policyReason?: string;
+  actionRequired: string;
+};
+
+export type ReviewQueueItem = {
+  caseId: string;
+  bankTransactionId: string;
+  sourceTransaction: BankTransaction;
+  reconciliationResult: ReconciliationResult;
+  candidateLedgerEntries: LedgerEntry[];
+  exceptions: Exception[];
+  evidence: EvidenceItem[];
+  ruleTrace: RuleTraceStep[];
+  investigation?: InvestigationResult;
+  currentState: HumanReviewState;
+  decisionHistory: HumanReviewDecision[];
+  outstandingEvidenceRequests: string[];
+  guidance: ReviewerGuidance;
 };
 
 export type ClosePackageSummary = {
