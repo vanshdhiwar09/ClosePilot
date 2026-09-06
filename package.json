@@ -13,6 +13,7 @@
     "eval": "tsx src/evaluation/cli.ts"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "lucide-react": "^1.41.0",
     "neatlogs": "^1.1.19",
     "react": "^19.2.8",

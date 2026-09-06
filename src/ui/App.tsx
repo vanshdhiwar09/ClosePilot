@@ -1,5 +1,6 @@
 // src/ui/App.tsx
 import React, { useState } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { AppShell } from "./components/layout/AppShell";
 import { AppHeader } from "./components/layout/AppHeader";
 import { NavTabId } from "./components/layout/AppSidebar";
@@ -226,6 +227,7 @@ export const App: React.FC = () => {
           )}
         </>
       )}
+      <Analytics />
     </AppShell>
   );
 };
