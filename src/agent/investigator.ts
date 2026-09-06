@@ -13,19 +13,33 @@ import {
   ModelPrompt,
 } from "./provider";
 import { PolicyValidator } from "./policy";
+import {
+  InvestigationLifecycleEvent,
+  InvestigationLifecycleEventType,
+  InvestigationRunRecorder,
+  InvestigationRunTrace,
+  PolicyEvaluationRecord,
+} from "../observability";
 
 export type InvestigatorOptions = {
   maxToolCalls?: number;
   modelProvider?: InvestigationModelProvider;
+  provider?: InvestigationModelProvider;
+  recorder?: InvestigationRunRecorder;
 };
 
 export class AutonomousInvestigator {
   private readonly provider: InvestigationModelProvider;
   private readonly maxToolCalls: number;
+  private readonly recorder?: InvestigationRunRecorder;
 
   constructor(options?: InvestigatorOptions) {
-    this.provider = options?.modelProvider || new DeterministicMockProvider();
+    this.provider =
+      options?.modelProvider ||
+      options?.provider ||
+      new DeterministicMockProvider();
     this.maxToolCalls = options?.maxToolCalls ?? 10;
+    this.recorder = options?.recorder;
   }
 
   /**
@@ -37,13 +51,53 @@ export class AutonomousInvestigator {
     options?: InvestigatorOptions
   ): Promise<InvestigationResult> {
     const maxToolCalls = options?.maxToolCalls ?? this.maxToolCalls;
+    const recorder = options?.recorder ?? this.recorder;
     const investigationId = `INV-${caseId}-${Date.now()}`;
     const investigatedAt = new Date().toISOString();
 
     const startTime = performance.now();
+    const events: InvestigationLifecycleEvent[] = [];
+    const policyEvaluations: PolicyEvaluationRecord[] = [];
+
+    const emitEvent = (
+      eventType: InvestigationLifecycleEventType,
+      payload: Record<string, unknown> = {}
+    ) => {
+      const event: InvestigationLifecycleEvent = {
+        eventId: `EVT-${caseId}-${Date.now()}-${events.length + 1}`,
+        runId: investigationId,
+        caseId,
+        eventType,
+        timestamp: new Date().toISOString(),
+        payload,
+      };
+      events.push(event);
+      if (recorder) {
+        try {
+          recorder.recordEvent(event);
+        } catch {
+          // Never break financial reconciliation on logging errors
+        }
+      }
+    };
+
+    const recordTraceSafe = (trace: InvestigationRunTrace) => {
+      if (recorder) {
+        try {
+          recorder.recordTrace(trace);
+        } catch {
+          // Never break financial reconciliation on logging errors
+        }
+      }
+    };
+
+    try {
+      emitEvent("investigation_started", { caseId });
 
     // Step 1: Load initial case context
+    emitEvent("tool_called", { toolName: "get_case", caseId });
     const caseDetail = toolbox.get_case(caseId);
+    emitEvent("tool_completed", { toolName: "get_case", caseId });
     const exceptions = caseDetail.exceptions.map((e) => e.type);
 
     // Step 2: Auto-resolved cases bypass deep investigation
@@ -83,6 +137,47 @@ export class AutonomousInvestigator {
           autoResolutionAllowed: true,
         },
       };
+
+      emitEvent("investigation_skipped", {
+        caseId,
+        bankTransactionId: caseDetail.bankTransaction.id,
+        reason: "Auto-reconciled with zero exceptions; deep investigation bypassed per accounting policy.",
+      });
+
+      emitEvent("investigation_completed", {
+        caseId,
+        outcome: "SKIPPED_AUTO_RESOLVED",
+        durationMs,
+      });
+
+      recordTraceSafe({
+        runId: investigationId,
+        caseId,
+        bankTransactionId: caseDetail.bankTransaction.id,
+        startTime: investigatedAt,
+        endTime: new Date().toISOString(),
+        durationMs,
+        provider: this.provider.name,
+        outcome: "SKIPPED_AUTO_RESOLVED",
+        recommendation: result.recommendation,
+        confidence: "HIGH",
+        riskLevel: "LOW",
+        requiresHumanReview: false,
+        toolCalls: toolbox.getRecordedToolCalls(),
+        policyEvaluations: [
+          {
+            policyRule: "AUTO_RESOLVE_GUARD",
+            isPermitted: true,
+            policyReason: "Auto-reconciled case verified safe with zero exceptions.",
+            forcedHumanReview: false,
+            timestamp: investigatedAt,
+          },
+        ],
+        evidenceIds: result.evidenceIds,
+        events: [...events],
+        metadata: result.metadata || {},
+      });
+
       return investigationResultSchema.parse(result);
     }
 
@@ -92,7 +187,9 @@ export class AutonomousInvestigator {
     // Tool Call A: Evidence verification
     if (toolbox.getRecordedToolCalls().length < maxToolCalls) {
       try {
+        emitEvent("tool_called", { toolName: "get_evidence", caseId });
         const evidenceItems = toolbox.get_evidence(caseId);
+        emitEvent("tool_completed", { toolName: "get_evidence", count: evidenceItems.length });
         observations.evidenceSummary = {
           count: evidenceItems.length,
           kinds: evidenceItems.map((e) => e.kind),
@@ -108,7 +205,9 @@ export class AutonomousInvestigator {
       for (const cand of caseDetail.candidateLedgerEntries) {
         if (toolbox.getRecordedToolCalls().length >= maxToolCalls) break;
         try {
+          emitEvent("tool_called", { toolName: "get_ledger_entry", ledgerEntryId: cand.id });
           const entryDetail = toolbox.get_ledger_entry(cand.id);
+          emitEvent("tool_completed", { toolName: "get_ledger_entry", ledgerEntryId: cand.id });
           candidatesDetail.push({
             id: cand.id,
             debit: cand.debit,
@@ -132,10 +231,12 @@ export class AutonomousInvestigator {
         caseDetail.candidateLedgerEntries.length > 1)
     ) {
       try {
+        emitEvent("tool_called", { toolName: "get_related_transactions", caseId });
         const related = toolbox.get_related_transactions(caseId, {
           searchByVendor: true,
           dateWindowDays: 30,
         });
+        emitEvent("tool_completed", { toolName: "get_related_transactions", matchCount: related.relatedLedgerCount });
         observations.relatedTransactions = related;
       } catch (err: any) {
         observations.relatedTransactionsError = err.message;
@@ -145,7 +246,9 @@ export class AutonomousInvestigator {
     // Tool Call D: Case review history
     if (toolbox.getRecordedToolCalls().length < maxToolCalls) {
       try {
+        emitEvent("tool_called", { toolName: "get_case_history", caseId });
         const history = toolbox.get_case_history(caseId);
+        emitEvent("tool_completed", { toolName: "get_case_history", decisionsCount: history.length });
         observations.priorReviewDecisions = history.length;
       } catch {
         observations.priorReviewDecisions = 0;
@@ -178,6 +281,26 @@ export class AutonomousInvestigator {
       modelResponse.riskLevel
     );
 
+    policyEvaluations.push({
+      policyRule: policy.policyRule,
+      isPermitted: policy.isPermitted,
+      policyReason: policy.policyReason,
+      forcedHumanReview: policy.forcedHumanReview,
+      timestamp: new Date().toISOString(),
+      context: {
+        exceptions,
+        riskLevel: modelResponse.riskLevel,
+        modelAction: modelResponse.recommendedAction,
+      },
+    });
+
+    emitEvent("policy_evaluated", {
+      policyRule: policy.policyRule,
+      isPermitted: policy.isPermitted,
+      policyReason: policy.policyReason,
+      forcedHumanReview: policy.forcedHumanReview,
+    });
+
     // Step 6: Construct structured investigation result
     const outcome = policy.isPermitted ? "COMPLETED" : "FAILED_POLICY_CHECK";
 
@@ -199,6 +322,17 @@ export class AutonomousInvestigator {
         requiredEvidenceTypes: modelResponse.requiredEvidenceTypes,
       };
     }
+
+    emitEvent("recommendation_generated", {
+      action: finalRecommendation.action,
+      suggestedReason: finalRecommendation.suggestedReason,
+      confidence: modelResponse.confidence,
+      riskLevel: modelResponse.riskLevel,
+      isPermitted: policy.isPermitted,
+      rawModelAction: rawModelRecommendation.action,
+    });
+
+    const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
 
     const result: InvestigationResult = {
       investigationId,
@@ -223,10 +357,79 @@ export class AutonomousInvestigator {
         modelProvider: this.provider.name,
         exceptionsDetected: exceptions,
         autoResolutionAllowed: caseDetail.autoResolutionAllowed,
-        durationMs: Math.round((performance.now() - startTime) * 100) / 100,
+        durationMs,
       },
     };
 
+    emitEvent("investigation_completed", {
+      outcome,
+      durationMs,
+      requiresHumanReview: true,
+    });
+
+    recordTraceSafe({
+      runId: investigationId,
+      caseId,
+      bankTransactionId: caseDetail.bankTransaction.id,
+      startTime: investigatedAt,
+      endTime: new Date().toISOString(),
+      durationMs,
+      provider: this.provider.name,
+      outcome,
+      recommendation: finalRecommendation,
+      rawModelRecommendation:
+        rawModelRecommendation.action !== finalRecommendation.action
+          ? rawModelRecommendation
+          : undefined,
+      confidence: modelResponse.confidence,
+      riskLevel: modelResponse.riskLevel,
+      requiresHumanReview: true,
+      toolCalls: toolbox.getRecordedToolCalls(),
+      policyEvaluations,
+      evidenceIds: result.evidenceIds,
+      events: [...events],
+      metadata: result.metadata || {},
+    });
+
     return investigationResultSchema.parse(result);
+  } catch (err: any) {
+    const errorDurationMs = Math.round((performance.now() - startTime) * 100) / 100;
+    emitEvent("investigation_failed", {
+      error: err.message,
+      stack: err.stack,
+    });
+
+    recordTraceSafe({
+      runId: investigationId,
+      caseId,
+      bankTransactionId: "unknown",
+      startTime: investigatedAt,
+      endTime: new Date().toISOString(),
+      durationMs: errorDurationMs,
+      provider: this.provider.name,
+      outcome: "FAILED_EXECUTION",
+      recommendation: {
+        action: "ESCALATE_TO_MANAGEMENT",
+        suggestedReason: `Investigation execution failed: ${err.message}`,
+      },
+      confidence: "LOW",
+      riskLevel: "CRITICAL",
+      requiresHumanReview: true,
+      toolCalls: toolbox.getRecordedToolCalls(),
+      policyEvaluations,
+      evidenceIds: [],
+      events: [...events],
+      error: {
+        message: err.message,
+        stack: err.stack,
+      },
+      metadata: {
+        error: err.message,
+        durationMs: errorDurationMs,
+      },
+    });
+
+    throw err;
   }
+}
 }

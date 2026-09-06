@@ -24,12 +24,20 @@ import {
   ClosePackage,
   ReviewQueueItem,
 } from "../review/types";
+import {
+  InvestigationRunRecorder,
+  InMemoryRunRecorder,
+  InvestigationRunTrace,
+  ObservabilityMetrics,
+  calculateObservabilityMetrics,
+} from "../observability";
 
 export type EndToEndWorkflowOptions = {
   fixtureName?: string;
   groundTruthVersion?: string;
   investigator?: AutonomousInvestigator;
   investigatorOptions?: InvestigatorOptions;
+  recorder?: InvestigationRunRecorder;
   packageOptions?: ClosePackageOptions;
   humanActions?: ApplyActionParams[];
   investigateAutoResolved?: boolean;
@@ -40,6 +48,8 @@ export type EndToEndWorkflowResult = {
   investigations: InvestigationResult[];
   reviewQueue: ReviewQueueItem[];
   closePackage: ClosePackage;
+  traces: ReadonlyArray<InvestigationRunTrace>;
+  observabilityMetrics?: ObservabilityMetrics;
   summary: {
     totalCases: number;
     autoResolvedCases: number;
@@ -75,8 +85,18 @@ export async function runEndToEndReconciliationWorkflow(
   const evaluationCases: EvaluationCase[] = groundTruth.evaluationCases;
 
   const pipelineCtx = initializePipelineContext(bankTransactions, ledgerEntries);
+  const recorder =
+    options?.recorder ||
+    options?.investigatorOptions?.recorder ||
+    new InMemoryRunRecorder();
+
+  const investigatorOptions: InvestigatorOptions = {
+    ...options?.investigatorOptions,
+    recorder,
+  };
+
   const investigator =
-    options?.investigator || new AutonomousInvestigator(options?.investigatorOptions);
+    options?.investigator || new AutonomousInvestigator(investigatorOptions);
 
   // Step 1: Run deterministic reconciliation
   const inputs: CaseReviewInput[] = [];
@@ -159,11 +179,18 @@ export async function runEndToEndReconciliationWorkflow(
   const closedCases = closePackage.cases.filter((c) => c.isClosed).length;
   const openCases = totalCases - closedCases;
 
+  const traces =
+    recorder instanceof InMemoryRunRecorder ? recorder.getTraces() : [];
+  const observabilityMetrics =
+    traces.length > 0 ? calculateObservabilityMetrics(traces) : undefined;
+
   return {
     session,
     investigations,
     reviewQueue,
     closePackage,
+    traces,
+    observabilityMetrics,
     summary: {
       totalCases,
       autoResolvedCases: autoResolvedCount,
