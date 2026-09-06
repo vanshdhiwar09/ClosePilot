@@ -82,6 +82,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       open: false,
+      watch: {
+        // Ignore the screenshots directory — dropping images there must not crash the dev server
+        ignored: ["**/docs/screenshots/**"],
+      },
     },
   };
 });
