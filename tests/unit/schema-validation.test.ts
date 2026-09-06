@@ -1,4 +1,4 @@
-﻿// Unit tests for schema validation and fixture/ground-truth integrity
+// Unit tests for schema validation and fixture/ground-truth integrity
 // Run with: npx vitest run tests/unit
 
 import { describe, it, expect } from "vitest";
@@ -31,23 +31,15 @@ import {
   validateException,
   validateEvidenceItem,
   validateEvaluationCase,
+  isReviewRequired,
+  isMatched,
+  isException,
   getFixtureMetadata,
   loadFixture,
   loadGroundTruth,
 } from "../../src/schemas";
 import * as fs from "node:fs";
 import * as path from "node:path";
-
-// Type guards
-export const isReviewRequired = (
-  status: EvaluationCase["expectedStatus"]
-): status is "review_required" => status === "review_required";
-export const isMatched = (
-  status: EvaluationCase["expectedStatus"]
-): status is "matched" => status === "matched";
-export const isException = (
-  status: EvaluationCase["expectedStatus"]
-): status is "exception" => status === "exception";
 
 describe("BankTransaction Schema", () => {
   const validTx: BankTransaction = {
@@ -148,6 +140,20 @@ describe("SupportingDocument Schema", () => {
   it("validates a valid SupportingDocument", () => {
     const result = supportingDocumentSchema.parse(validDoc);
     expect(result.id).toBe("SD-001");
+  });
+
+  it("validates a SupportingDocument with relative URI and synthetic hash", () => {
+    const localDoc: SupportingDocument = {
+      id: "SD-002",
+      documentType: "invoice",
+      fileName: "invoice-vendor-a-001.pdf",
+      uri: "/documents/invoice-vendor-a-001.pdf",
+      sha256: "hash-sd001-reference-string",
+      source: "synthetic_document",
+    };
+    const result = supportingDocumentSchema.parse(localDoc);
+    expect(result.id).toBe("SD-002");
+    expect(result.uri).toBe("/documents/invoice-vendor-a-001.pdf");
   });
 
   it("rejects invalid documentType", () => {
@@ -480,5 +486,33 @@ describe("Fixture & Ground-Truth Integrity", () => {
       ec.expectedExceptionTypes.forEach((t: string) => foundTypes.add(t));
     });
     expect(foundTypes.size).toBeGreaterThan(0);
+  });
+
+  it("all fixture bank transactions pass schema validation", () => {
+    expect(fixture.bankTransactions.length).toBeGreaterThan(0);
+    fixture.bankTransactions.forEach((tx: unknown) => {
+      expect(() => validateBankTransaction(tx)).not.toThrow();
+    });
+  });
+
+  it("all fixture ledger entries pass schema validation", () => {
+    expect(fixture.ledgerEntries.length).toBeGreaterThan(0);
+    fixture.ledgerEntries.forEach((entry: unknown) => {
+      expect(() => validateLedgerEntry(entry)).not.toThrow();
+    });
+  });
+
+  it("all fixture supporting documents pass schema validation", () => {
+    expect(fixture.documents.length).toBeGreaterThan(0);
+    fixture.documents.forEach((doc: unknown) => {
+      expect(() => validateSupportingDocument(doc)).not.toThrow();
+    });
+  });
+
+  it("all fixture chart of accounts pass schema validation", () => {
+    expect(fixture.chartOfAccounts.length).toBeGreaterThan(0);
+    fixture.chartOfAccounts.forEach((account: unknown) => {
+      expect(() => validateChartOfAccount(account)).not.toThrow();
+    });
   });
 });

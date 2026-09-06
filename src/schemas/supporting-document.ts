@@ -9,14 +9,17 @@ export const supportingDocumentSchema = z.object({
   id: z.string(),
   documentType: z.enum(["invoice", "receipt", "statement", "other"]),
   fileName: z.string(),
-  uri: z.string().url(),
-  sha256: z.string().length(64),
+  uri: z.string().min(1), // Supports relative paths (e.g., /documents/...) and full URLs
+  sha256: z.string().min(1), // Supports synthetic content hashes and 64-character SHA-256 hashes
   vendor: z.string().optional(),
   amount: z.string().optional(),
   currency: z.string().optional(),
   documentDate: z.string().optional(),
   references: z.array(z.string()).optional(),
   source: z.literal("synthetic_document"),
+  sourceRecordId: z.string().optional(),
+  schemaVersion: z.literal("1").optional(),
+  ingestedAt: z.string().optional(),
 });
 
 // Normalized comparison fields

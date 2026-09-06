@@ -3,6 +3,7 @@
 // Monetary amounts are decimal strings; no floating-point.
 
 import { z } from "zod";
+import { subtractMoney } from "../utils/money";
 
 export type LedgerEntry = z.infer<typeof ledgerEntrySchema>;
 
@@ -25,12 +26,9 @@ export const ledgerEntrySchema = z.object({
   rawHash: z.string(),
 });
 
-// Derived signed amount: debit - credit (computed deterministically)
+// Derived signed amount: debit - credit (computed deterministically via BigInt cents)
 export const getLedgerSignedAmount = (entry: LedgerEntry): string => {
-  const debitNum = parseFloat(entry.debit);
-  const creditNum = parseFloat(entry.credit);
-  const diff = debitNum - creditNum;
-  return diff.toFixed(2);
+  return subtractMoney(entry.debit, entry.credit);
 };
 
 // Normalized comparison fields

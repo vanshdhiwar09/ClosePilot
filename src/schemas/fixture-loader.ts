@@ -16,7 +16,6 @@ import {
 } from "./exception";
 import { EvidenceItem, evidenceItemSchema } from "./evidence-item";
 import { EvaluationCase, evaluationCaseSchema } from "./evaluation-case";
-import { EvidenceItem as Ei } from "./evidence-item";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
